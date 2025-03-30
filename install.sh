@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Colors for better UI
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -22,7 +22,7 @@ echo -e "${GREEN}Développé par mpgamer75${NC}"
 echo -e "${BLUE}------------------------------------------${NC}"
 echo ""
 
-# Check for required tools
+# check si tous les outils sont bien présents
 echo -e "${BLUE}[INFO] Vérification des outils requis...${NC}"
 
 MISSING_TOOLS=()
@@ -60,7 +60,7 @@ else
     echo -e "${GREEN}[OK] Tous les outils requis sont déjà installés.${NC}"
 fi
 
-# Download the script
+# Télécharge le script
 echo -e "${BLUE}[INFO] Téléchargement du script Security Scanner...${NC}"
 curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/security -o security
 
@@ -69,10 +69,10 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Make it executable
+# Classique ==> rend le script exécutable
 chmod +x security
 
-# Move to /usr/local/bin
+# ça l'envoie à ==> /usr/local/bin
 echo -e "${BLUE}[INFO] Installation du script dans /usr/local/bin/...${NC}"
 sudo mv security /usr/local/bin/
 
