@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
-
+GOLD='\033[38,5,220m'
 #bannière 
 
 display_banner() {
@@ -26,7 +26,8 @@ display_banner() {
     echo -e "${YELLOW}Script d'analyse de sécurité automatisé${NC}"
     echo -e "${CYAN}------------------------------------------${NC}"
     echo -e "${GREEN}Développé par mpgamer75${NC}"
-    echo ""
+    echo -e "${GOLD}Version 1.0.1${NC}"
+    echo -e "${RED}==========================================${NC}"
 }
 
 check_tool() {
@@ -37,6 +38,7 @@ check_tool() {
     fi
 }
 
+# vérifie si tous les outils sont bien installés
 check_required_tools() {
     echo -e "${BLUE}[INFO] Vérification des outils requis...${NC}"
     check_tool nmap
@@ -47,12 +49,14 @@ check_required_tools() {
     echo -e "${GREEN}[OK] Tous les outils requis sont installés.${NC}"
 }
 
+# créer le dossier de sortie pour y mettre tous les résultats
 create_output_dir() {
-    OUTPUT_DIR="scan_results_$(date +%Y%m%d_%H%M%S)"
+    OUTPUT_DIR="scan_results_$(date +'%Y-%m-%d %H:%M:%S' | tr ' ' '_')"
     mkdir -p "$OUTPUT_DIR"
     echo -e "${GREEN}[INFO] Les résultats seront enregistrés dans le dossier: $OUTPUT_DIR${NC}"
 }
 
+# nmap
 run_nmap_scan() {
     echo -e "\n${CYAN}[SCAN] Lancement du scan NMAP...${NC}"
     echo -e "${YELLOW}Commande: nmap -sS -sV -Pn -A $IP_ADDRESS -oN $OUTPUT_DIR/nmap_scan.txt${NC}"
@@ -66,6 +70,7 @@ run_nmap_scan() {
     fi
 }
 
+# dirb
 run_dirb_scan() {
     if [ -n "$WEBSITE_URL" ]; then
         echo -e "\n${CYAN}[SCAN] Lancement du scan DIRB...${NC}"
@@ -83,7 +88,7 @@ run_dirb_scan() {
     fi
 }
 
-# Function to run nikto scan
+# nikto
 run_nikto_scan() {
     if [ -n "$WEBSITE_URL" ]; then
         echo -e "\n${CYAN}[SCAN] Lancement du scan NIKTO...${NC}"
@@ -101,7 +106,7 @@ run_nikto_scan() {
     fi
 }
 
-# Function to run gobuster scan
+# gobuster
 run_gobuster_scan() {
     if [ -n "$WEBSITE_URL" ]; then
         echo -e "\n${CYAN}[SCAN] Lancement du scan GOBUSTER...${NC}"
@@ -119,7 +124,7 @@ run_gobuster_scan() {
     fi
 }
 
-# Function to run sqlmap scan
+# sqlmap
 run_sqlmap_scan() {
     if [ -n "$WEBSITE_URL" ]; then
         echo -e "\n${CYAN}[SCAN] Lancement du scan SQLMAP...${NC}"
@@ -137,7 +142,7 @@ run_sqlmap_scan() {
     fi
 }
 
-# Function to generate summary report
+# résumé
 generate_summary() {
     SUMMARY_FILE="$OUTPUT_DIR/rapport_synthese.txt"
     echo "RAPPORT DE SYNTHÈSE DES SCANS DE SÉCURITÉ" > "$SUMMARY_FILE"
@@ -165,7 +170,7 @@ main() {
     check_required_tools
     create_output_dir
     
-    # Get IP address from user
+    # demande l'adresse IP à l'utilisateur
     echo -e "${BLUE}Entrez l'adresse IP de la cible:${NC}"
     read IP_ADDRESS
     
@@ -175,7 +180,7 @@ main() {
         read IP_ADDRESS
     done
     
-    # Get website URL (optional)
+    # website
     echo -e "${BLUE}Entrez l'URL du site web (laissez vide si non applicable):${NC}"
     read WEBSITE_URL
     
@@ -187,14 +192,14 @@ main() {
         echo -e "${YELLOW}Aucun site web spécifié. Seul le scan NMAP sera effectué.${NC}"
     fi
     
-    # Run scans sequentially
+    
     run_nmap_scan
     run_dirb_scan
     run_nikto_scan
     run_gobuster_scan
     run_sqlmap_scan
     
-    # Sommaire
+    
     generate_summary
     
     echo -e "\n${GREEN}[TERMINÉ] Tous les scans ont été effectués.${NC}"
