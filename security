@@ -10,7 +10,6 @@ GOLD='\033[1;33m'
 NC='\033[0m'
 
 #bannière 
-
 display_banner() {
     clear
     echo -e "${BLUE}"
@@ -26,7 +25,7 @@ display_banner() {
     echo -e "${YELLOW}Script d'analyse de sécurité automatisé${NC}"
     echo -e "${CYAN}------------------------------------------${NC}"
     echo -e "${GREEN}Développé par mpgamer75${NC}"
-    echo -e "${GOLD}Version 1.0.1${NC}"
+    echo -e "${GOLD}Version 1.1.0${NC}"
     echo -e "${RED}==========================================${NC}"
 }
 
@@ -51,17 +50,60 @@ check_required_tools() {
 
 # créer le dossier de sortie pour y mettre tous les résultats
 create_output_dir() {
-    OUTPUT_DIR="scan_results_$(date +'%Y-%m-%d %H:%M:%S' | tr ' ' '_')"
+    OUTPUT_DIR="scan_results_$(date +'%Y-%m-%d_%H-%M-%S')"
     mkdir -p "$OUTPUT_DIR"
     echo -e "${GREEN}[INFO] Les résultats seront enregistrés dans le dossier: $OUTPUT_DIR${NC}"
 }
 
+# Fonction pour obtenir les options personnalisées pour nmap
+customize_nmap() {
+    echo -e "${CYAN}Personnalisation du scan NMAP${NC}"
+    echo -e "${YELLOW}Options disponibles pour NMAP:${NC}"
+    echo "1. Types de scan"
+    echo "   -sS : Scan SYN (par défaut)"
+    echo "   -sT : Scan TCP connect"
+    echo "   -sU : Scan UDP"
+    echo "   -sA : Scan ACK"
+    echo "   -sV : Détection de version"
+    echo "2. Options d'hôte"
+    echo "   -Pn : Traite tous les hôtes comme étant en ligne"
+    echo "   -A  : Active la détection OS, version, script et traceroute"
+    echo "3. Options de timing"
+    echo "   -T0 : Très lent, furtif"
+    echo "   -T1 : Lent"
+    echo "   -T2 : Raisonnable"
+    echo "   -T3 : Normal (défaut)"
+    echo "   -T4 : Agressif"
+    echo "   -T5 : Très agressif"
+    echo "4. Scripts"
+    echo "   --script=default : Scripts par défaut"
+    echo "   --script=vuln    : Scripts de vulnérabilité"
+    echo "   --script=safe    : Scripts sûrs"
+    
+    echo -e "${BLUE}Entrez vos flags personnalisés pour NMAP (ex: -sS -sV -Pn -A -T4):${NC}"
+    read NMAP_CUSTOM_FLAGS
+    
+    if [ -z "$NMAP_CUSTOM_FLAGS" ]; then
+        echo -e "${YELLOW}Aucun flag personnalisé fourni, utilisation des flags par défaut.${NC}"
+        NMAP_CUSTOM_FLAGS="-sS -sV -Pn -A"
+    fi
+    
+    echo -e "${GREEN}Flags NMAP définis: $NMAP_CUSTOM_FLAGS${NC}"
+}
+
 # nmap
 run_nmap_scan() {
-    echo -e "\n${CYAN}[SCAN] Lancement du scan NMAP...${NC}"
-    echo -e "${YELLOW}Commande: nmap -sS -sV -Pn -A $IP_ADDRESS -oN $OUTPUT_DIR/nmap_scan.txt${NC}"
+    if [ "$CUSTOM_MODE" = true ]; then
+        customize_nmap
+        NMAP_CMD="nmap $NMAP_CUSTOM_FLAGS $IP_ADDRESS -oN $OUTPUT_DIR/nmap_scan.txt"
+    else
+        NMAP_CMD="nmap -sS -sV -Pn -A $IP_ADDRESS -oN $OUTPUT_DIR/nmap_scan.txt"
+    fi
     
-    nmap -sS -sV -Pn -A "$IP_ADDRESS" -oN "$OUTPUT_DIR/nmap_scan.txt"
+    echo -e "\n${CYAN}[SCAN] Lancement du scan NMAP...${NC}"
+    echo -e "${YELLOW}Commande: $NMAP_CMD${NC}"
+    
+    eval $NMAP_CMD
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}[SUCCÈS] Scan NMAP terminé. Résultats enregistrés dans $OUTPUT_DIR/nmap_scan.txt${NC}"
@@ -70,13 +112,50 @@ run_nmap_scan() {
     fi
 }
 
+# Fonction pour obtenir les options personnalisées pour dirb
+customize_dirb() {
+    echo -e "${CYAN}Personnalisation du scan DIRB${NC}"
+    echo -e "${YELLOW}Options disponibles pour DIRB:${NC}"
+    echo "1. Wordlists"
+    echo "   -w /usr/share/wordlists/dirb/common.txt"
+    echo "   -w /usr/share/wordlists/dirb/big.txt"
+    echo "   -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
+    echo "2. Options"
+    echo "   -a : Spécifier l'User-Agent"
+    echo "   -z : Ajouter un délai en millisecondes"
+    echo "   -c : Set a cookie for the HTTP request"
+    echo "   -x : Extension list (ex: php,asp,html)"
+    echo "   -t : Spécifier le nombre de threads"
+    
+    echo -e "${BLUE}Entrez le chemin de la wordlist (laissez vide pour celle par défaut):${NC}"
+    read DIRB_WORDLIST
+    
+    if [ -z "$DIRB_WORDLIST" ]; then
+        DIRB_WORDLIST=""  # Utilise la wordlist par défaut de dirb
+    else
+        DIRB_WORDLIST="-w $DIRB_WORDLIST"
+    fi
+    
+    echo -e "${BLUE}Entrez vos flags personnalisés pour DIRB (ex: -a 'Mozilla/5.0' -z 100):${NC}"
+    read DIRB_CUSTOM_FLAGS
+    
+    echo -e "${GREEN}Configuration DIRB définie: $DIRB_WORDLIST $DIRB_CUSTOM_FLAGS${NC}"
+}
+
 # dirb
 run_dirb_scan() {
     if [ -n "$WEBSITE_URL" ]; then
-        echo -e "\n${CYAN}[SCAN] Lancement du scan DIRB...${NC}"
-        echo -e "${YELLOW}Commande: dirb $WEBSITE_URL -o $OUTPUT_DIR/dirb_scan.txt${NC}"
+        if [ "$CUSTOM_MODE" = true ]; then
+            customize_dirb
+            DIRB_CMD="dirb $WEBSITE_URL $DIRB_WORDLIST $DIRB_CUSTOM_FLAGS -o $OUTPUT_DIR/dirb_scan.txt"
+        else
+            DIRB_CMD="dirb $WEBSITE_URL -o $OUTPUT_DIR/dirb_scan.txt"
+        fi
         
-        dirb "$WEBSITE_URL" -o "$OUTPUT_DIR/dirb_scan.txt"
+        echo -e "\n${CYAN}[SCAN] Lancement du scan DIRB...${NC}"
+        echo -e "${YELLOW}Commande: $DIRB_CMD${NC}"
+        
+        eval $DIRB_CMD
         
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}[SUCCÈS] Scan DIRB terminé. Résultats enregistrés dans $OUTPUT_DIR/dirb_scan.txt${NC}"
@@ -88,13 +167,43 @@ run_dirb_scan() {
     fi
 }
 
+# Fonction pour obtenir les options personnalisées pour nikto
+customize_nikto() {
+    echo -e "${CYAN}Personnalisation du scan NIKTO${NC}"
+    echo -e "${YELLOW}Options disponibles pour NIKTO:${NC}"
+    echo "1. Options de base"
+    echo "   -Tuning 1-9  : Spécifier les tests à exécuter"
+    echo "   -ssl         : Forcer le mode SSL"
+    echo "   -nossl       : Forcer le mode non-SSL"
+    echo "   -timeout val : Timeout pour les requêtes"
+    echo "   -Plugins     : Liste des plugins à exécuter"
+    echo "2. Options d'authentification"
+    echo "   -id login:password : Identifiants pour Basic Auth"
+    echo "   -cookies val       : Utiliser des cookies spécifiques"
+    echo "3. Options avancées"
+    echo "   -useproxy host:port : Utiliser un proxy"
+    echo "   -mutate num         : Mutation des URL pour la découverte"
+    
+    echo -e "${BLUE}Entrez vos flags personnalisés pour NIKTO (ex: -Tuning 1,2,3,4,5,6 -ssl):${NC}"
+    read NIKTO_CUSTOM_FLAGS
+    
+    echo -e "${GREEN}Flags NIKTO définis: $NIKTO_CUSTOM_FLAGS${NC}"
+}
+
 # nikto
 run_nikto_scan() {
     if [ -n "$WEBSITE_URL" ]; then
-        echo -e "\n${CYAN}[SCAN] Lancement du scan NIKTO...${NC}"
-        echo -e "${YELLOW}Commande: nikto -h $WEBSITE_URL -o $OUTPUT_DIR/nikto_scan.txt${NC}"
+        if [ "$CUSTOM_MODE" = true ]; then
+            customize_nikto
+            NIKTO_CMD="nikto -h $WEBSITE_URL $NIKTO_CUSTOM_FLAGS -o $OUTPUT_DIR/nikto_scan.txt"
+        else
+            NIKTO_CMD="nikto -h $WEBSITE_URL -o $OUTPUT_DIR/nikto_scan.txt"
+        fi
         
-        nikto -h "$WEBSITE_URL" -o "$OUTPUT_DIR/nikto_scan.txt"
+        echo -e "\n${CYAN}[SCAN] Lancement du scan NIKTO...${NC}"
+        echo -e "${YELLOW}Commande: $NIKTO_CMD${NC}"
+        
+        eval $NIKTO_CMD
         
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}[SUCCÈS] Scan NIKTO terminé. Résultats enregistrés dans $OUTPUT_DIR/nikto_scan.txt${NC}"
@@ -106,13 +215,59 @@ run_nikto_scan() {
     fi
 }
 
+# Fonction pour obtenir les options personnalisées pour gobuster
+customize_gobuster() {
+    echo -e "${CYAN}Personnalisation du scan GOBUSTER${NC}"
+    echo -e "${YELLOW}Options disponibles pour GOBUSTER:${NC}"
+    echo "1. Mode de scan"
+    echo "   dir  : Mode directory/file enumeration (par défaut)"
+    echo "   dns  : Mode DNS enumeration"
+    echo "   vhost: Mode VHOST enumeration"
+    echo "2. Wordlists"
+    echo "   -w /usr/share/wordlists/dirb/common.txt (par défaut)"
+    echo "   -w /usr/share/wordlists/dirb/big.txt"
+    echo "   -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
+    echo "3. Options"
+    echo "   -t num          : Nombre de threads"
+    echo "   -a user-agent   : User-Agent"
+    echo "   -x php,html,txt : Extensions à rechercher"
+    echo "   -c cookie       : Cookie pour les requêtes"
+    echo "   -k              : Ignorer les vérifications SSL"
+    
+    echo -e "${BLUE}Entrez le mode de scan (dir, dns, vhost) [dir]:${NC}"
+    read GOBUSTER_MODE
+    
+    if [ -z "$GOBUSTER_MODE" ]; then
+        GOBUSTER_MODE="dir"
+    fi
+    
+    echo -e "${BLUE}Entrez le chemin de la wordlist (laissez vide pour celle par défaut):${NC}"
+    read GOBUSTER_WORDLIST
+    
+    if [ -z "$GOBUSTER_WORDLIST" ]; then
+        GOBUSTER_WORDLIST="/usr/share/wordlists/dirb/common.txt"
+    fi
+    
+    echo -e "${BLUE}Entrez vos flags personnalisés pour GOBUSTER (ex: -t 50 -x php,html):${NC}"
+    read GOBUSTER_CUSTOM_FLAGS
+    
+    echo -e "${GREEN}Configuration GOBUSTER définie: $GOBUSTER_MODE -w $GOBUSTER_WORDLIST $GOBUSTER_CUSTOM_FLAGS${NC}"
+}
+
 # gobuster
 run_gobuster_scan() {
     if [ -n "$WEBSITE_URL" ]; then
-        echo -e "\n${CYAN}[SCAN] Lancement du scan GOBUSTER...${NC}"
-        echo -e "${YELLOW}Commande: gobuster dir -u $WEBSITE_URL -w /usr/share/wordlists/dirb/common.txt -o $OUTPUT_DIR/gobuster_scan.txt${NC}"
+        if [ "$CUSTOM_MODE" = true ]; then
+            customize_gobuster
+            GOBUSTER_CMD="gobuster $GOBUSTER_MODE -u $WEBSITE_URL -w $GOBUSTER_WORDLIST $GOBUSTER_CUSTOM_FLAGS -o $OUTPUT_DIR/gobuster_scan.txt"
+        else
+            GOBUSTER_CMD="gobuster dir -u $WEBSITE_URL -w /usr/share/wordlists/dirb/common.txt -o $OUTPUT_DIR/gobuster_scan.txt"
+        fi
         
-        gobuster dir -u "$WEBSITE_URL" -w /usr/share/wordlists/dirb/common.txt -o "$OUTPUT_DIR/gobuster_scan.txt"
+        echo -e "\n${CYAN}[SCAN] Lancement du scan GOBUSTER...${NC}"
+        echo -e "${YELLOW}Commande: $GOBUSTER_CMD${NC}"
+        
+        eval $GOBUSTER_CMD
         
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}[SUCCÈS] Scan GOBUSTER terminé. Résultats enregistrés dans $OUTPUT_DIR/gobuster_scan.txt${NC}"
@@ -124,13 +279,53 @@ run_gobuster_scan() {
     fi
 }
 
+# Fonction pour obtenir les options personnalisées pour sqlmap
+customize_sqlmap() {
+    echo -e "${CYAN}Personnalisation du scan SQLMAP${NC}"
+    echo -e "${YELLOW}Options disponibles pour SQLMAP:${NC}"
+    echo "1. Options de base"
+    echo "   --level=num   : Niveau de détail (1-5, 1=par défaut)"
+    echo "   --risk=num    : Niveau de risque (1-3, 1=par défaut)"
+    echo "2. Options d'injection"
+    echo "   --technique=B,E,U,S,T,Q : Techniques d'injection spécifiques"
+    echo "   --param-del=x  : Délimiteur de paramètre dans l'URL"
+    echo "   --dbms=type    : Type de DBMS ciblé (mysql, postgres, etc.)"
+    echo "3. Options d'extraction"
+    echo "   --dbs          : Lister les bases de données"
+    echo "   --tables       : Lister les tables"
+    echo "   --dump         : Dump les données"
+    echo "   --dump-all     : Dump toutes les données"
+    echo "4. Options avancées"
+    echo "   --threads=num  : Nombre de threads"
+    echo "   --proxy=proxy  : Utiliser un proxy"
+    echo "   --time-sec=num : Délai de temps pour les injections time-based"
+    
+    echo -e "${BLUE}Entrez vos flags personnalisés pour SQLMAP (ex: --level=3 --risk=2 --dbs):${NC}"
+    read SQLMAP_CUSTOM_FLAGS
+    
+    if [ -z "$SQLMAP_CUSTOM_FLAGS" ]; then
+        SQLMAP_CUSTOM_FLAGS="--batch --level=1 --risk=1"
+    else
+        SQLMAP_CUSTOM_FLAGS="--batch $SQLMAP_CUSTOM_FLAGS"
+    fi
+    
+    echo -e "${GREEN}Flags SQLMAP définis: $SQLMAP_CUSTOM_FLAGS${NC}"
+}
+
 # sqlmap
 run_sqlmap_scan() {
     if [ -n "$WEBSITE_URL" ]; then
-        echo -e "\n${CYAN}[SCAN] Lancement du scan SQLMAP...${NC}"
-        echo -e "${YELLOW}Commande: sqlmap -u $WEBSITE_URL --batch --level=1 --risk=1 -o -v 1 --output-dir=$OUTPUT_DIR${NC}"
+        if [ "$CUSTOM_MODE" = true ]; then
+            customize_sqlmap
+            SQLMAP_CMD="sqlmap -u $WEBSITE_URL $SQLMAP_CUSTOM_FLAGS -o -v 1 --output-dir=$OUTPUT_DIR"
+        else
+            SQLMAP_CMD="sqlmap -u $WEBSITE_URL --batch --level=1 --risk=1 -o -v 1 --output-dir=$OUTPUT_DIR"
+        fi
         
-        sqlmap -u "$WEBSITE_URL" --batch --level=1 --risk=1 -o -v 1 --output-dir="$OUTPUT_DIR"
+        echo -e "\n${CYAN}[SCAN] Lancement du scan SQLMAP...${NC}"
+        echo -e "${YELLOW}Commande: $SQLMAP_CMD${NC}"
+        
+        eval $SQLMAP_CMD
         
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}[SUCCÈS] Scan SQLMAP terminé. Résultats enregistrés dans $OUTPUT_DIR/sqlmap${NC}"
@@ -152,7 +347,19 @@ generate_summary() {
         echo "URL du site web: $WEBSITE_URL" >> "$SUMMARY_FILE"
     fi
     echo "" >> "$SUMMARY_FILE"
-    echo "Scans effectués:" >> "$SUMMARY_FILE"
+    echo "Mode: $([ "$CUSTOM_MODE" = true ] && echo "Personnalisé" || echo "Standard")" >> "$SUMMARY_FILE"
+    echo "" >> "$SUMMARY_FILE"
+    echo "Commandes exécutées:" >> "$SUMMARY_FILE"
+    
+    # Ajoute les commandes exécutées au rapport
+    [ -n "$NMAP_CMD" ] && echo "- NMAP: $NMAP_CMD" >> "$SUMMARY_FILE"
+    [ -n "$DIRB_CMD" ] && echo "- DIRB: $DIRB_CMD" >> "$SUMMARY_FILE"
+    [ -n "$NIKTO_CMD" ] && echo "- NIKTO: $NIKTO_CMD" >> "$SUMMARY_FILE"
+    [ -n "$GOBUSTER_CMD" ] && echo "- GOBUSTER: $GOBUSTER_CMD" >> "$SUMMARY_FILE"
+    [ -n "$SQLMAP_CMD" ] && echo "- SQLMAP: $SQLMAP_CMD" >> "$SUMMARY_FILE"
+    
+    echo "" >> "$SUMMARY_FILE"
+    echo "Fichiers de résultats:" >> "$SUMMARY_FILE"
     echo "- NMAP: $OUTPUT_DIR/nmap_scan.txt" >> "$SUMMARY_FILE"
     
     if [ -n "$WEBSITE_URL" ]; then
@@ -183,6 +390,20 @@ main() {
     # website
     echo -e "${BLUE}Entrez l'URL du site web (laissez vide si non applicable):${NC}"
     read WEBSITE_URL
+    
+    # Mode personnalisé ou par défaut
+    echo -e "${BLUE}Choisissez le mode de scan:${NC}"
+    echo -e "1. ${GREEN}Standard${NC} - Utilise les options par défaut pour chaque outil"
+    echo -e "2. ${MAGENTA}Personnalisé${NC} - Vous permet de configurer les options pour chaque outil"
+    read -p "Votre choix (1/2): " SCAN_MODE_CHOICE
+    
+    if [ "$SCAN_MODE_CHOICE" = "2" ]; then
+        CUSTOM_MODE=true
+        echo -e "${MAGENTA}Mode personnalisé activé. Vous pourrez configurer chaque outil avant son exécution.${NC}"
+    else
+        CUSTOM_MODE=false
+        echo -e "${GREEN}Mode standard activé. Les options par défaut seront utilisées.${NC}"
+    fi
     
     echo -e "\n${MAGENTA}[DÉMARRAGE] Lancement des scans de sécurité...${NC}"
     echo -e "${BLUE}Cible IP: $IP_ADDRESS${NC}"
