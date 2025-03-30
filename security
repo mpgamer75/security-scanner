@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
-GOLD='\033[38,5,220m'
+GOLD='\033[38;5;220m'
 #bannière 
 
 display_banner() {
