@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="images_readme/logo2.png" alt="Logo Security Scanner" style="background: transparent;">
+</p>
+
+_____________________________________________________________________________________________________
+
 # Security Scanner
 
 Un outil automatisé pour scanner la sécurité des systèmes et sites web. Ce script bash effectue une série de scans de sécurité courants, enregistre les résultats et génère un rapport de synthèse.
