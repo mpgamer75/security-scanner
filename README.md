@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images_readme/logo2.png" alt="Logo Security Scanner" style="background: transparent;">
+  <img src="images_readme/logo7.png" alt="Logo Security Scanner" style="background: transparent;">
 </p>
 
 _____________________________________________________________________________________________________
