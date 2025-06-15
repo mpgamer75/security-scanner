@@ -15,17 +15,24 @@ Un outil automatisé pour scanner la sécurité des systèmes et sites web. Ce s
 - **Scan Nikto**: Détection de vulnérabilités web
 - **Scan Gobuster**: Brute force de chemins et fichiers
 - **Scan SQLMap**: Détection d'injections SQL
-- **Interface utilisateur**: Colorée et conviviale
-- **Rapports**: Génération automatique avec synthèse
+- **Scan Whatweb**: Identification rapide des technologies
+- **Port-scan intelligent**: Détection automatique du port SSH (22/tcp) et proposition de Hydra pour brute‑force réaliste si pertinent
+- **Rapports structurés**: - summary.txt : synthèse lisible et bien espacée
+                           - summary.json : format JSON pour intégration dans d’autres outils
+
+- **Rapports accessibles dans le dossier "Documents" sur votre machine locale**
 
 ## Prérequis
 
 Le script nécessite les outils suivants :
+
 - nmap
 - dirb
 - nikto
 - gobuster
 - sqlmap
+- hydra
+- whatweb
 
 Sur les systèmes basés sur Debian/Ubuntu, vous pouvez les installer avec :
 
