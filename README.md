@@ -1,4 +1,4 @@
-# Security Scanner - Advanced Security Assessment Tool
+# Security Scanner
 
 <p align="center">
   <img src="images_readme/logo7.png" alt="Logo" width="250"/>
