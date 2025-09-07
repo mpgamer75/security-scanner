@@ -1,5 +1,5 @@
 <p align="center">
-  <b><font size="12">Security Scanner</font></b>
+  <b><font size="30">Security Scanner</font></b>
 </p>
 
 
