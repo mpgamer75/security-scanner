@@ -54,13 +54,13 @@ curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/unin
 Ou pour une désinstallation manuelle :
 
 ```bash
-# Supprimer l'exécutable
+# Supprime l'exécutable
 sudo rm -f /usr/local/bin/security
 
-# Supprimer l'entrée du bureau
+# Supprime l'entrée du bureau
 rm -f ~/.local/share/applications/security-scanner.desktop
 
-# Supprimer les outils Go (optionnel)
+# Supprime les outils Go (optionnel)
 rm -f $(go env GOPATH)/bin/{subfinder,nuclei,amass,assetfinder}
 ```
 
@@ -135,8 +135,8 @@ security
 ### Options en Ligne de Commande
 
 ```bash
-security --help      # Afficher l'aide
-security --version   # Afficher la version
+security --help      # Affiche l'aide
+security --version   # Affiche la version
 ```
 
 ### Flux de Travail Typique
@@ -289,7 +289,7 @@ export CUSTOM_WORDLIST="/path/to/custom/wordlist.txt"
 **Erreur: "Tool not found"**
 
 ```bash
-# Vérifier l'installation des outils
+# Vérifie l'installation des outils
 security --help
 which nmap subfinder gobuster
 ```
@@ -297,9 +297,9 @@ which nmap subfinder gobuster
 **Scans lents**
 
 ```bash
-# Vérifier la connectivité réseau
+# Vérifie la connectivité réseau
 ping 8.8.8.8
-# Ajuster les paramètres de timing Nmap
+# Ajuste les paramètres de timing Nmap
 ```
 
 **Permissions insuffisantes**
