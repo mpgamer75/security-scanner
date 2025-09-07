@@ -12,7 +12,7 @@ WHITE='\033[1;37m'
 GRAY='\033[0;90m'
 NC='\033[0m'
 
-VERSION="2.0.0"
+VERSION="2.0.1"
 
 display_banner() {
     clear
@@ -467,6 +467,7 @@ prepare_output() {
     echo -e "${GREEN}[INFO]${NC} Results directory: ${WHITE}$OUTDIR${NC}"
 }
 
+# Fonction améliorée pour exécuter les commandes avec gestion d'erreurs robuste
 execute_with_timeout() {
     local name="$1"
     local command="$2"
@@ -475,18 +476,30 @@ execute_with_timeout() {
     
     echo -e "${CYAN}[START]${NC} $name"
     
-    if timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1; then
-        echo -e "${GREEN}[DONE]${NC} $name"
-        return 0
-    else
-        local exit_code=$?
-        if [ $exit_code -eq 124 ]; then
-            echo -e "${YELLOW}[TIMEOUT]${NC} $name (${timeout_duration}s)"
-        else
-            echo -e "${RED}[ERROR]${NC} $name failed (exit code: $exit_code)"
-        fi
-        return $exit_code
-    fi
+    # Désactiver temporairement errexit pour cette commande
+    set +e
+    timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1
+    local exit_code=$?
+    set -e
+    
+    case $exit_code in
+        0)
+            echo -e "${GREEN}[DONE]${NC} $name"
+            return 0
+            ;;
+        124)
+            echo -e "${YELLOW}[TIMEOUT]${NC} $name (${timeout_duration}s) - continuing with next scan..."
+            # Écrire un message dans le fichier de sortie pour indiquer le timeout
+            echo "SCAN TIMEOUT AFTER ${timeout_duration} SECONDS" >> "$output_file"
+            return 0  # Retourner 0 pour continuer le script
+            ;;
+        *)
+            echo -e "${RED}[ERROR]${NC} $name failed (exit code: $exit_code) - continuing with next scan..."
+            # Écrire un message dans le fichier de sortie pour indiquer l'erreur
+            echo "SCAN FAILED WITH EXIT CODE $exit_code" >> "$output_file"
+            return 0  # Retourner 0 pour continuer le script
+            ;;
+    esac
 }
 
 show_scan_menu() {
@@ -588,21 +601,45 @@ run_network_scans() {
     
     echo -e "\n${RED}[NETWORK]${NC} Starting network port scanning..."
     
+    # 1. Scan rapide initial avec Nmap
+    execute_with_timeout "Nmap Quick Discovery" "nmap -n -sn '$target'" 30 "$OUTDIR/network/nmap_ping.txt"
+    
+    # 2. Scan rapide des ports les plus communs
     execute_with_timeout "Nmap Fast Scan" "nmap -n -T5 --top-ports 1000 --min-rate=5000 '$target'" 300 "$OUTDIR/network/nmap_fast.txt"
     
-    execute_with_timeout "Nmap Full TCP Scan" "nmap -n -T4 -p- -sS -sV -sC '$target'" 1800 "$OUTDIR/network/nmap_full.txt"
+    # 3. Scan complet TCP avec détection de service et scripts
+    execute_with_timeout "Nmap Full TCP Scan" "nmap -n -Pn -T4 -p- -sS -sV -sC '$target'" 1800 "$OUTDIR/network/nmap_full.txt"
     
-    execute_with_timeout "Nmap UDP Scan" "nmap -n -T4 --top-ports 100 -sU '$target'" 600 "$OUTDIR/network/nmap_udp.txt"
+    # 4. Scan avec options agressives mais rapide
+    execute_with_timeout "Nmap Aggressive Scan" "nmap -n -Pn -T4 -A --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_aggressive.txt"
     
+    # 5. Scan UDP des ports critiques
+    execute_with_timeout "Nmap UDP Scan" "nmap -n -Pn -T4 --top-ports 100 -sU '$target'" 600 "$OUTDIR/network/nmap_udp.txt"
+    
+    # 6. Scan de vulnérabilités avec scripts Nmap
+    execute_with_timeout "Nmap Vulnerability Scan" "nmap -n -Pn -T4 --script vuln --top-ports 1000 '$target'" 900 "$OUTDIR/network/nmap_vulns.txt"
+    
+    # 7. Scan stealthier pour éviter la détection
+    execute_with_timeout "Nmap Stealth Scan" "nmap -n -Pn -T2 -f -D RND:10 --top-ports 500 '$target'" 900 "$OUTDIR/network/nmap_stealth.txt"
+    
+    # 8. Masscan si disponible
     if command -v masscan &> /dev/null; then
         execute_with_timeout "Masscan Ultra-Fast" "masscan '$target' -p1-65535 --rate=50000" 300 "$OUTDIR/network/masscan.txt"
     fi
     
+    # 9. Unicornscan si disponible
     if command -v unicornscan &> /dev/null; then
-        execute_with_timeout "Unicornscan TCP" "unicornscan -mT '$target':1-65535" 600 "$OUTDIR/network/unicornscan_tcp.txt"
+        execute_with_timeout "Unicornscan TCP" "unicornscan -mT '$target':1-1000" 300 "$OUTDIR/network/unicornscan_tcp.txt"
     fi
     
-    execute_with_timeout "OS Fingerprinting" "nmap -n -O '$target'" 300 "$OUTDIR/network/nmap_os.txt"
+    # 10. OS Fingerprinting avec timeout réduit et options robustes
+    execute_with_timeout "OS Fingerprinting" "nmap -n -Pn -O --osscan-guess --max-os-tries 2 '$target'" 180 "$OUTDIR/network/nmap_os.txt"
+    
+    # 11. Scan des services avec bannière
+    execute_with_timeout "Service Banner Grab" "nmap -n -Pn -T4 -sV --version-intensity 5 --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_services.txt"
+    
+    # 12. Scan avec techniques d'évasion
+    execute_with_timeout "Nmap Evasion Scan" "nmap -n -Pn -T2 -f --mtu 24 --data-length 1337 --top-ports 500 '$target'" 900 "$OUTDIR/network/nmap_evasion.txt"
     
     echo -e "${GREEN}[COMPLETED]${NC} Network scans finished"
 }
@@ -675,6 +712,8 @@ run_web_scans() {
 generate_clean_report() {
     local report_file="$OUTDIR/reports/executive_summary.txt"
     
+    echo -e "${CYAN}[INFO]${NC} Generating executive summary report..."
+    
     {
         echo "╔══════════════════════════════════════════════════════════════════════════════╗"
         echo "║                            SECURITY ASSESSMENT REPORT                       ║"
@@ -743,6 +782,19 @@ generate_clean_report() {
                 local open_ports=$(grep -c "open" "$OUTDIR/network/nmap_fast.txt" 2>/dev/null || echo "0")
                 echo "│  Open ports detected: $open_ports"
             fi
+            
+            # Analyser les services détectés
+            if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
+                local services_detected=$(grep -c "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null || echo "0")
+                echo "│  Services detected: $services_detected"
+            fi
+            
+            # Vérifier les vulnérabilités trouvées
+            if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+                local vulns_found=$(grep -c "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo "0")
+                echo "│  Potential vulnerabilities: $vulns_found"
+            fi
+            
             echo "└──────────────────────────────────────────────────────────────────────────────┘"
             echo
         fi
@@ -774,8 +826,24 @@ generate_clean_report() {
         
         # Résumé rapide des découvertes
         if [ -f "$OUTDIR/network/nmap_fast.txt" ]; then
-            echo "│  Network Services:"
+            echo "│  Top Open Ports:"
             grep "open" "$OUTDIR/network/nmap_fast.txt" 2>/dev/null | head -5 | while read line; do
+                echo "│    - $line"
+            done
+        fi
+        
+        # Afficher les services critiques détectés
+        if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
+            echo "│  Critical Services:"
+            grep -E "(ssh|ftp|telnet|http|https|smtp|pop|imap|ldap|mysql|postgresql|oracle|mssql|vnc|rdp)" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -5 | while read line; do
+                echo "│    - $line"
+            done
+        fi
+        
+        # Afficher les vulnérabilités critiques si trouvées
+        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+            echo "│  Security Issues:"
+            grep -i "VULNERABLE\|CVE\|CRITICAL\|HIGH" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -3 | while read line; do
                 echo "│    - $line"
             done
         fi
@@ -788,7 +856,7 @@ generate_clean_report() {
         fi
         
         if [ -f "$OUTDIR/web/gobuster_common.txt" ]; then
-            echo "│  Important Directories:"
+            echo "│  Important Web Directories:"
             head -5 "$OUTDIR/web/gobuster_common.txt" 2>/dev/null | while read line; do
                 echo "│    - $line"
             done
@@ -796,6 +864,17 @@ generate_clean_report() {
         
         echo "└──────────────────────────────────────────────────────────────────────────────┘"
         echo
+        
+        # Statistiques de scan
+        echo "┌─ SCAN STATISTICS ─────────────────────────────────────────────────────────────┐"
+        local total_files=$(find "$OUTDIR" -type f | wc -l)
+        local total_size=$(du -sh "$OUTDIR" 2>/dev/null | cut -f1)
+        echo "│  Total files generated: $total_files"
+        echo "│  Total data collected: $total_size"
+        echo "│  Scan completed: $(date)"
+        echo "└──────────────────────────────────────────────────────────────────────────────┘"
+        echo
+        
         echo "╔══════════════════════════════════════════════════════════════════════════════╗"
         echo "║                    Report generated by Security Scanner v$VERSION                    ║"
         echo "╚══════════════════════════════════════════════════════════════════════════════╝"
@@ -838,6 +917,9 @@ main() {
     
     prepare_output
     
+    # Fonction pour gérer les interruptions utilisateur (Ctrl+C)
+    trap 'echo -e "\n${YELLOW}[INFO]${NC} Scan interrupted by user. Generating partial report..."; generate_clean_report; exit 130' SIGINT
+    
     case "$SCAN_CHOICE" in
         1)
             check_and_install_tools "osint"
@@ -864,6 +946,7 @@ main() {
             ;;
     esac
     
+    # Toujours générer le rapport, même en cas de timeouts
     generate_clean_report
     
     echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
@@ -871,6 +954,9 @@ main() {
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
     echo -e "${WHITE}Results saved in:${NC} ${CYAN}$OUTDIR${NC}"
     echo -e "${WHITE}Executive summary:${NC} ${CYAN}$OUTDIR/reports/executive_summary.txt${NC}"
+    echo
+    echo -e "${CYAN}[TIP]${NC} View results with: ${WHITE}cat $OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${CYAN}[TIP]${NC} Browse files with: ${WHITE}ls -la $OUTDIR/network/${NC}"
     echo -e "\n${YELLOW}Thank you for using Security Scanner!${NC}"
 }
 
