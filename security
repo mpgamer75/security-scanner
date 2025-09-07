@@ -917,34 +917,72 @@ main() {
     
     prepare_output
     
+    # Variable pour suivre les interruptions
+    local scan_interrupted=false
+    
     # Fonction pour gérer les interruptions utilisateur (Ctrl+C)
-    trap 'echo -e "\n${YELLOW}[INFO]${NC} Scan interrupted by user. Generating partial report..."; generate_clean_report; exit 130' SIGINT
+    handle_interrupt() {
+        echo -e "\n${YELLOW}[INFO]${NC} Scan interrupted by user. Generating partial report..."
+        scan_interrupted=true
+        generate_clean_report
+        echo -e "\n${CYAN}[INFO]${NC} Partial results saved in: ${WHITE}$OUTDIR${NC}"
+        exit 130
+    }
+    
+    # Configurer le trap pour les interruptions
+    trap 'handle_interrupt' SIGINT
+    
+    # Fonction pour exécuter les scans avec gestion d'interruption
+    run_scan_with_interrupt_check() {
+        local scan_function="$1"
+        shift
+        local args=("$@")
+        
+        if [ "$scan_interrupted" = false ]; then
+            if $scan_function "${args[@]}"; then
+                return 0
+            else
+                local exit_code=$?
+                if [ $exit_code -eq 130 ]; then
+                    scan_interrupted=true
+                    return 130
+                fi
+                return 0
+            fi
+        fi
+        return 0
+    }
     
     case "$SCAN_CHOICE" in
         1)
             check_and_install_tools "osint"
-            run_osint_scans "$TARGET" "$DOMAIN"
+            run_scan_with_interrupt_check run_osint_scans "$TARGET" "$DOMAIN"
             ;;
         2)
             check_and_install_tools "domain"
-            run_domain_scans "$DOMAIN" "$URL"
+            run_scan_with_interrupt_check run_domain_scans "$DOMAIN" "$URL"
             ;;
         3)
             check_and_install_tools "network"
-            run_network_scans "$TARGET"
+            run_scan_with_interrupt_check run_network_scans "$TARGET"
             ;;
         4)
             check_and_install_tools "complete"
-            run_osint_scans "$TARGET" "$DOMAIN"
-            run_domain_scans "$DOMAIN" "$URL"
-            run_network_scans "$TARGET"
-            [ -n "$URL" ] && run_web_scans "$URL"
+            run_scan_with_interrupt_check run_osint_scans "$TARGET" "$DOMAIN"
+            [ "$scan_interrupted" = false ] && run_scan_with_interrupt_check run_domain_scans "$DOMAIN" "$URL"
+            [ "$scan_interrupted" = false ] && run_scan_with_interrupt_check run_network_scans "$TARGET"
+            [ "$scan_interrupted" = false ] && [ -n "$URL" ] && run_scan_with_interrupt_check run_web_scans "$URL"
             ;;
         *)
             echo -e "${RED}[ERROR]${NC} Invalid selection"
             exit 1
             ;;
     esac
+    
+    # Vérifier si le scan a été interrompu
+    if [ "$scan_interrupted" = true ]; then
+        exit 130
+    fi
     
     # Toujours générer le rapport, même en cas de timeouts
     generate_clean_report
