@@ -212,6 +212,9 @@ start_process() {
 }
 
 monitor_processes() {
+    local total_processes=${#running_processes[@]}
+    local completed=0
+    
     while [ ${#running_processes[@]} -gt 0 ]; do
         for name in "${!running_processes[@]}"; do
             local pid=${running_processes[$name]}
@@ -219,9 +222,17 @@ monitor_processes() {
                 echo -e "${GREEN}[DONE]${NC} $name"
                 completed_processes["$name"]=$pid
                 unset running_processes["$name"]
+                ((completed++))
             fi
         done
-        sleep 1
+        
+        # Affichage du progrès si plus de 3 processus
+        if [ $total_processes -gt 3 ]; then
+            local remaining=${#running_processes[@]}
+            echo -e "${CYAN}[PROGRESS]${NC} $completed/$total_processes completed, $remaining running..."
+        fi
+        
+        sleep 2
     done
 }
 
@@ -297,7 +308,7 @@ run_domain_scans() {
     
     monitor_processes
     
-    # Consolide les sous-domaines
+    # Consolider les sous-domaines
     if [ -f "$OUTDIR/domains/subdomains_subfinder.txt" ] || [ -f "$OUTDIR/domains/subdomains_amass.txt" ] || [ -f "$OUTDIR/domains/subdomains_assetfinder.txt" ]; then
         echo -e "${CYAN}[INFO]${NC} Consolidating subdomain results..."
         cat "$OUTDIR/domains"/subdomains_*.txt 2>/dev/null | sort -u > "$OUTDIR/domains/all_subdomains.txt"
@@ -396,7 +407,7 @@ generate_clean_report() {
                 fi
             done
             
-            # Enumération des sous-domaines trouvés
+            # Compter les sous-domaines trouvés
             if [ -f "$OUTDIR/domains/all_subdomains.txt" ]; then
                 local subdomain_count=$(wc -l < "$OUTDIR/domains/all_subdomains.txt" 2>/dev/null || echo "0")
                 echo "│  Total subdomains discovered: $subdomain_count"
@@ -416,7 +427,7 @@ generate_clean_report() {
                 fi
             done
             
-            # open ports
+            # Analyser les ports ouverts
             if [ -f "$OUTDIR/network/nmap_fast.txt" ]; then
                 local open_ports=$(grep -c "open" "$OUTDIR/network/nmap_fast.txt" 2>/dev/null || echo "0")
                 echo "│  Open ports detected: $open_ports"
@@ -425,7 +436,7 @@ generate_clean_report() {
             echo
         fi
         
-        # web results
+        # Analyse des résultats web
         if [ -d "$OUTDIR/web" ] && [ "$(ls -A "$OUTDIR/web" 2>/dev/null)" ]; then
             echo "┌─ WEB APPLICATION TESTING ─────────────────────────────────────────────────────┐"
             for f in "$OUTDIR/web"/*; do
@@ -439,7 +450,7 @@ generate_clean_report() {
                 fi
             done
             
-            # directories found
+            # Analyser les répertoires trouvés
             if [ -f "$OUTDIR/web/gobuster_common.txt" ]; then
                 local dirs_found=$(wc -l < "$OUTDIR/web/gobuster_common.txt" 2>/dev/null || echo "0")
                 echo "│  Web directories found: $dirs_found"
@@ -483,7 +494,7 @@ generate_clean_report() {
     echo -e "${GREEN}[REPORT]${NC} Executive summary: ${WHITE}$report_file${NC}"
 }
 
-# Main
+# Main execution
 main() {
     # Parse arguments
     case "${1:-}" in
@@ -553,5 +564,5 @@ main() {
     echo -e "\n${YELLOW}Thank you for using Security Scanner!${NC}"
 }
 
-# main function
+# Execute main function
 main "$@"

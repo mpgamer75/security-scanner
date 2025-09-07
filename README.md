@@ -1,4 +1,3 @@
-
 <p align="center">
   <img src="images_readme/logo7.png" alt="Logo" width="250"/>
 </p>
@@ -43,6 +42,29 @@ chmod +x install.sh
 sudo chmod +x security
 sudo mv security /usr/local/bin/
 ```
+
+### Désinstallation
+
+Pour désinstaller complètement Security Scanner :
+
+```bash
+curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/uninstall.sh | bash
+```
+
+Ou pour une désinstallation manuelle :
+
+```bash
+# Supprimer l'exécutable
+sudo rm -f /usr/local/bin/security
+
+# Supprimer l'entrée du bureau
+rm -f ~/.local/share/applications/security-scanner.desktop
+
+# Supprimer les outils Go (optionnel)
+rm -f $(go env GOPATH)/bin/{subfinder,nuclei,amass,assetfinder}
+```
+
+**Note :** La désinstallation ne supprime pas automatiquement les résultats de scan ni les wordlists pour préserver vos données.
 
 ## Prérequis
 
@@ -141,7 +163,7 @@ security --version   # Afficher la version
    - Consultez le rapport dans `recon_YYYYMMDD_HHMMSS/`
    - Résumé exécutif disponible dans `reports/executive_summary.txt`
 
-## 📁 Structure des Résultats
+## Structure des Résultats
 
 ```
 security_scan_20250907_143022/
@@ -244,10 +266,10 @@ export CUSTOM_WORDLIST="/path/to/custom/wordlist.txt"
 
 ### Utilisation Légale
 
-- ✅ Utilisez uniquement sur vos propres systèmes
-- ✅ Obtenez une autorisation écrite avant tout test
-- ✅ Respectez les conditions d'utilisation des services
-- ❌ N'utilisez jamais sur des systèmes sans autorisation
+- Utilisez uniquement sur vos propres systèmes
+- Obtenez une autorisation écrite avant tout test
+- Respectez les conditions d'utilisation des services
+- N'utilisez jamais sur des systèmes sans autorisation
 
 ### Bonnes Pratiques
 
@@ -350,5 +372,5 @@ Pour obtenir de l'aide :
 ---
 
 <p align="center">
-  <strong>⚡ Security Scanner - Professional Security Assessment Tool ⚡</strong>
+  <strong>Security Scanner - Professional Security Assessment Tool</strong>
 </p>
