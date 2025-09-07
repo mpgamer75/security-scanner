@@ -94,7 +94,7 @@ NOTES:
 EOF
 }
 
-# Variables globales pour les processus
+# Variables globales
 declare -A running_processes
 declare -A completed_processes
 OUTDIR=""
@@ -154,298 +154,27 @@ install_missing_tool() {
     fi
 }
 
-check_and_install_tools() {
-    local scan_type="$1"
-    local tools_needed=()
-    local need_wordlists=false
-    
-    case "$scan_type" in
-        "osint")
-            tools_needed=(whois dig)
-            # theharvester dnsenum dnsrecon sont optionnels
-            ;;
-        "domain")
-            tools_needed=(openssl)
-            # subfinder amass assetfinder sslscan sont optionnels
-            ;;
-        "network")
-            tools_needed=(nmap)
-            # masscan unicornscan sont optionnels
-            ;;
-        "complete")
-            tools_needed=(whois dig nmap openssl)
-            need_wordlists=true
-            # Les autres outils sont optionnels
-            ;;
-    esac
-    
-    local missing=()
-    echo -e "${CYAN}[INFO]${NC} Checking required tools for $scan_type scan..."
-    
-    for tool in "${tools_needed[@]}"; do
-        if ! command -v "$tool" &>/dev/null; then
-            missing+=("$tool")
-        fi
-    done
-    
-    if [ ${#missing[@]} -gt 0 ]; then
-        echo -e "${YELLOW}[WARNING]${NC} Missing critical tools: ${missing[*]}"
-        read -rp "Install missing tools automatically? [Y/n]: " install_choice
-        
-        if [[ ! "$install_choice" =~ ^[Nn] ]]; then
-            for tool in "${missing[@]}"; do
-                install_missing_tool "$tool"
-            done
-        else
-            echo -e "${RED}[ERROR]${NC} Cannot proceed without required tools"
-            exit 1
-        fi
-    fi
-    
-    # Installer les wordlists si nécessaire
-    if [ "$need_wordlists" = true ] || [ "$scan_type" = "complete" ]; then
-        install_wordlists
-    fi
-    
-    echo -e "${GREEN}[OK]${NC} All required tools are available"
-}
-
-prepare_output() {
-    OUTDIR="security_scan_$(date +'%Y%m%d_%H%M%S')"
-    mkdir -p "$OUTDIR"/{osint,domains,network,web,reports}
-    echo -e "${GREEN}[INFO]${NC} Results directory: ${WHITE}$OUTDIR${NC}"
-}
-
-# Nouvelle fonction pour exécuter les commandes de façon synchrone avec timeout
-execute_with_timeout() {
-    local name="$1"
-    local command="$2"
-    local timeout_duration="${3:-300}"
-    local output_file="$4"
-    
-    echo -e "${CYAN}[START]${NC} $name"
-    
-    # Utiliser timeout et redirection robuste
-    if timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1; then
-        echo -e "${GREEN}[DONE]${NC} $name"
-        return 0
-    else
-        local exit_code=$?
-        if [ $exit_code -eq 124 ]; then
-            echo -e "${YELLOW}[TIMEOUT]${NC} $name (${timeout_duration}s)"
-        else
-            echo -e "${RED}[ERROR]${NC} $name failed (exit code: $exit_code)"
-        fi
-        return $exit_code
-    fi
-}
-
-show_scan_menu() {
-    echo -e "\n${YELLOW}Select scan type:${NC}"
-    echo -e "${CYAN}1)${NC} OSINT & Information Gathering"
-    echo -e "${CYAN}2)${NC} Domain & Certificate Analysis" 
-    echo -e "${CYAN}3)${NC} Network Port Scanning"
-    echo -e "${CYAN}4)${NC} Complete Assessment (All scans)"
-    echo
-}
-
-# OSINT Functions
-run_osint_scans() {
-    local target="$1"
-    local domain="$2"
-    
-    echo -e "\n${RED}[OSINT]${NC} Starting information gathering..."
-    
-    if [ -n "$domain" ]; then
-        execute_with_timeout "WHOIS Lookup" "whois '$domain'" 60 "$OUTDIR/osint/whois.txt"
-        
-        execute_with_timeout "DNS Enumeration" "
-            echo '=== A Records ===' 
-            dig +short '$domain' A
-            echo -e '\n=== MX Records ==='
-            dig +short '$domain' MX
-            echo -e '\n=== NS Records ==='
-            dig +short '$domain' NS
-            echo -e '\n=== TXT Records ==='
-            dig +short '$domain' TXT
-        " 60 "$OUTDIR/osint/dns_enum.txt"
-        
-        if command -v dnsenum &> /dev/null; then
-            execute_with_timeout "DNS Enumeration (Advanced)" "dnsenum '$domain'" 300 "$OUTDIR/osint/dnsenum.txt"
-        fi
-        
-        if command -v dnsrecon &> /dev/null; then
-            execute_with_timeout "DNS Reconnaissance" "dnsrecon -d '$domain' -t std" 300 "$OUTDIR/osint/dnsrecon.txt"
-        fi
-        
-        if command -v theharvester &> /dev/null; then
-            execute_with_timeout "Email Harvesting" "theharvester -d '$domain' -l 100 -b google,bing,yahoo" 300 "$OUTDIR/osint/emails.txt"
-        fi
-    fi
-    
-    if [ -n "$target" ]; then
-        execute_with_timeout "Reverse DNS" "dig +short -x '$target'" 30 "$OUTDIR/osint/reverse_dns.txt"
-    fi
-    
-    echo -e "${GREEN}[COMPLETED]${NC} OSINT scans finished"
-}
-
-# Domain Functions
-run_domain_scans() {
-    local domain="$1"
-    local url="$2"
-    
-    echo -e "\n${RED}[DOMAINS]${NC} Starting domain and certificate analysis..."
-    
-    if [ -n "$domain" ]; then
-        if command -v subfinder &> /dev/null; then
-            execute_with_timeout "Subfinder Discovery" "subfinder -d '$domain' -silent" 300 "$OUTDIR/domains/subdomains_subfinder.txt"
-        fi
-        
-        if command -v amass &> /dev/null; then
-            execute_with_timeout "Amass Enumeration" "amass enum -passive -d '$domain'" 600 "$OUTDIR/domains/subdomains_amass.txt"
-        fi
-        
-        if command -v assetfinder &> /dev/null; then
-            execute_with_timeout "Assetfinder Discovery" "assetfinder '$domain'" 300 "$OUTDIR/domains/subdomains_assetfinder.txt"
-        fi
-        
-        execute_with_timeout "SSL Certificate Analysis" "echo | openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | openssl x509 -text" 30 "$OUTDIR/domains/ssl_cert.txt"
-        
-        if command -v sslscan &> /dev/null; then
-            execute_with_timeout "SSL Configuration Scan" "sslscan '$domain'" 300 "$OUTDIR/domains/sslscan.txt"
-        fi
-    fi
-    
-    if [ -n "$url" ]; then
-        if command -v whatweb &> /dev/null; then
-            execute_with_timeout "Technology Detection" "whatweb '$url' -v" 300 "$OUTDIR/domains/whatweb.txt"
-        fi
-        
-        if command -v wafw00f &> /dev/null; then
-            execute_with_timeout "WAF Detection" "wafw00f '$url'" 60 "$OUTDIR/domains/wafw00f.txt"
-        fi
-    fi
-    
-    # Consolider les sous-domaines
-    if ls "$OUTDIR/domains"/subdomains_*.txt 1> /dev/null 2>&1; then
-        echo -e "${CYAN}[INFO]${NC} Consolidating subdomain results..."
-        cat "$OUTDIR/domains"/subdomains_*.txt 2>/dev/null | sort -u > "$OUTDIR/domains/all_subdomains.txt"
-    fi
-    
-    echo -e "${GREEN}[COMPLETED]${NC} Domain scans finished"
-}
-
-# Network Functions
-run_network_scans() {
-    local target="$1"
-    
-    echo -e "\n${RED}[NETWORK]${NC} Starting network port scanning..."
-    
-    execute_with_timeout "Nmap Fast Scan" "nmap -n -T5 --top-ports 1000 --min-rate=5000 '$target'" 300 "$OUTDIR/network/nmap_fast.txt"
-    
-    execute_with_timeout "Nmap Full TCP Scan" "nmap -n -T4 -p- -sS -sV -sC '$target'" 1800 "$OUTDIR/network/nmap_full.txt"
-    
-    execute_with_timeout "Nmap UDP Scan" "nmap -n -T4 --top-ports 100 -sU '$target'" 600 "$OUTDIR/network/nmap_udp.txt"
-    
-    if command -v masscan &> /dev/null; then
-        execute_with_timeout "Masscan Ultra-Fast" "masscan '$target' -p1-65535 --rate=50000" 300 "$OUTDIR/network/masscan.txt"
-    fi
-    
-    if command -v unicornscan &> /dev/null; then
-        execute_with_timeout "Unicornscan TCP" "unicornscan -mT '$target':1-65535" 600 "$OUTDIR/network/unicornscan_tcp.txt"
-    fi
-    
-    execute_with_timeout "OS Fingerprinting" "nmap -n -O '$target'" 300 "$OUTDIR/network/nmap_os.txt"
-    
-    echo -e "${GREEN}[COMPLETED]${NC} Network scans finished"
-}
-
-# Web Functions
-run_web_scans() {
+download_wordlist() {
     local url="$1"
+    local output="$2"
+    local use_fallback="$3"
     
-    echo -e "\n${RED}[WEB]${NC} Starting web application testing..."
-    
-    # Les wordlists sont maintenant installées automatiquement via check_and_install_tools
-    local wordlist_dir="/usr/share/wordlists/dirb"
-    local fallback_dir="$HOME/.local/share/wordlists/dirb"
-    
-    # Déterminer quel répertoire de wordlists utiliser
-    if [ -f "$wordlist_dir/common.txt" ]; then
-        local common_wordlist="$wordlist_dir/common.txt"
-        local big_wordlist="$wordlist_dir/big.txt"
-    elif [ -f "$fallback_dir/common.txt" ]; then
-        local common_wordlist="$fallback_dir/common.txt"
-        local big_wordlist="$fallback_dir/big.txt"
+    if [ "$use_fallback" = true ]; then
+        curl -sSL --connect-timeout 10 --max-time 60 "$url" -o "$output" 2>/dev/null
     else
-        echo -e "${RED}[ERROR]${NC} No wordlists found. Run complete scan to install them."
-        return 1
+        curl -sSL --connect-timeout 10 --max-time 60 "$url" | sudo tee "$output" > /dev/null 2>&1
     fi
     
-    if command -v gobuster &> /dev/null; then
-        execute_with_timeout "Directory Enumeration (Common)" "gobuster dir -u '$url' -w '$common_wordlist' -t 50 -x php,html,txt,js" 600 "$OUTDIR/web/gobuster_common.txt"
-        
-        execute_with_timeout "Directory Enumeration (Big)" "gobuster dir -u '$url' -w '$big_wordlist' -t 30 -x php,html,txt" 900 "$OUTDIR/web/gobuster_big.txt"
-    fi
-    
-    if command -v dirb &> /dev/null; then
-        execute_with_timeout "Dirb Enumeration" "dirb '$url' '$common_wordlist'" 600 "$OUTDIR/web/dirb.txt"
-    fi
-    
-    if command -v nikto &> /dev/null; then
-        execute_with_timeout "Nikto Vulnerability Scan" "nikto -h '$url'" 600 "$OUTDIR/web/nikto.txt"
-    fi
-    
-    if command -v nuclei &> /dev/null; then
-        # Chercher les templates nuclei dans plusieurs emplacements
-        local template_dirs=(
-            "$HOME/nuclei-templates"
-            "$HOME/.local/share/nuclei-templates"
-            "/usr/share/nuclei-templates"
-            "$(go env GOPATH)/pkg/mod/github.com/projectdiscovery/nuclei-templates*"
-        )
-        
-        local template_dir=""
-        for dir in "${template_dirs[@]}"; do
-            if [ -d "$dir" ]; then
-                template_dir="$dir"
-                break
-            fi
-        done
-        
-        if [ -n "$template_dir" ]; then
-            execute_with_timeout "Nuclei Templates" "nuclei -u '$url' -t '$template_dir/'" 600 "$OUTDIR/web/nuclei.txt"
-        else
-            execute_with_timeout "Nuclei Basic" "nuclei -u '$url'" 300 "$OUTDIR/web/nuclei.txt"
-        fi
-    fi
-    
-    if command -v sqlmap &> /dev/null; then
-        mkdir -p "$OUTDIR/web/sqlmap"
-        execute_with_timeout "SQL Injection Testing" "sqlmap -u '$url' --batch --level=2 --risk=1 --output-dir='$OUTDIR/web/sqlmap'" 600 "$OUTDIR/web/sqlmap.log"
-    fi
-    
-    echo -e "${GREEN}[COMPLETED]${NC} Web scans finished"
+    return $?
 }
 
-create_default_wordlists() {
-    local wordlist_dir="/usr/share/wordlists/dirb"
+create_minimal_common() {
+    local output="$1"
+    local use_fallback="$2"
     
-    # Créer le répertoire s'il n'existe pas
-    if [ ! -d "$wordlist_dir" ]; then
-        sudo mkdir -p "$wordlist_dir" 2>/dev/null || {
-            wordlist_dir="$HOME/.local/share/wordlists/dirb"
-            mkdir -p "$wordlist_dir"
-        }
-    fi
-    
-    # Créer common.txt s'il n'existe pas
-    if [ ! -f "$wordlist_dir/common.txt" ]; then
-        cat > "$wordlist_dir/common.txt" << 'EOF'
-admin
+    local content="admin
+administrator
 index
-test
 login
 home
 about
@@ -466,13 +195,33 @@ tmp
 temp
 files
 data
-EOF
-    fi
+test
+admin.php
+login.php
+index.php
+config.php
+backup.sql
+database
+db
+phpinfo
+info
+server-info
+server-status
+robots.txt
+sitemap.xml"
     
-    # Créer big.txt s'il n'existe pas
-    if [ ! -f "$wordlist_dir/big.txt" ]; then
-        cat > "$wordlist_dir/big.txt" << 'EOF'
-admin
+    if [ "$use_fallback" = true ]; then
+        echo "$content" > "$output"
+    else
+        echo "$content" | sudo tee "$output" > /dev/null
+    fi
+}
+
+create_minimal_big() {
+    local output="$1"
+    local use_fallback="$2"
+    
+    local content="admin
 administration
 administrator
 api
@@ -571,8 +320,356 @@ var
 web
 webmail
 www
-EOF
+.htaccess
+.git
+.svn
+administrator/
+admin/
+login/
+wp-admin/
+wp-content/
+wp-includes/
+wp-config.php
+readme.txt
+license.txt
+changelog.txt
+version.txt"
+    
+    if [ "$use_fallback" = true ]; then
+        echo "$content" > "$output"
+    else
+        echo "$content" | sudo tee "$output" > /dev/null
     fi
+}
+
+create_minimal_wordlists() {
+    local wordlist_dir="$1"
+    local use_fallback="$2"
+    
+    create_minimal_common "$wordlist_dir/common.txt" "$use_fallback"
+    create_minimal_big "$wordlist_dir/big.txt" "$use_fallback"
+}
+
+install_wordlists() {
+    echo -e "${CYAN}[INFO]${NC} Checking wordlists availability..."
+    
+    local wordlist_dir="/usr/share/wordlists/dirb"
+    local fallback_dir="$HOME/.local/share/wordlists/dirb"
+    local use_fallback=false
+    
+    # Vérifier si on peut écrire dans /usr/share/wordlists
+    if [ ! -d "$wordlist_dir" ]; then
+        if ! sudo mkdir -p "$wordlist_dir" 2>/dev/null; then
+            wordlist_dir="$fallback_dir"
+            mkdir -p "$wordlist_dir"
+            use_fallback=true
+            echo -e "${YELLOW}[INFO]${NC} Using local wordlist directory: $wordlist_dir"
+        fi
+    fi
+    
+    # Vérifier si les wordlists existent déjà
+    if [ -f "$wordlist_dir/common.txt" ] && [ -f "$wordlist_dir/big.txt" ]; then
+        # Vérifier si ce sont de vraies wordlists (taille > 1KB)
+        local common_size=$(stat -c%s "$wordlist_dir/common.txt" 2>/dev/null || stat -f%z "$wordlist_dir/common.txt" 2>/dev/null || echo "0")
+        local big_size=$(stat -c%s "$wordlist_dir/big.txt" 2>/dev/null || stat -f%z "$wordlist_dir/big.txt" 2>/dev/null || echo "0")
+        
+        if [ "$common_size" -gt 1000 ] && [ "$big_size" -gt 5000 ]; then
+            echo -e "${GREEN}[OK]${NC} Wordlists already available"
+            return 0
+        fi
+    fi
+    
+    echo -e "${YELLOW}[MISSING]${NC} Wordlists not found or incomplete"
+    read -rp "Download and install wordlists? [Y/n]: " install_choice
+    
+    if [[ "$install_choice" =~ ^[Nn] ]]; then
+        echo -e "${YELLOW}[WARNING]${NC} Creating minimal wordlists for basic functionality..."
+        create_minimal_wordlists "$wordlist_dir" "$use_fallback"
+        return 0
+    fi
+    
+    echo -e "${CYAN}[INFO]${NC} Downloading wordlists..."
+    
+    # Télécharger common.txt
+    if download_wordlist "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt" "$wordlist_dir/common.txt" "$use_fallback"; then
+        echo -e "${GREEN}[OK]${NC} Downloaded common.txt"
+    else
+        echo -e "${YELLOW}[FALLBACK]${NC} Using alternative source for common.txt"
+        download_wordlist "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt" "$wordlist_dir/common.txt" "$use_fallback" || create_minimal_common "$wordlist_dir/common.txt" "$use_fallback"
+    fi
+    
+    # Télécharger big.txt  
+    if download_wordlist "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/big.txt" "$wordlist_dir/big.txt" "$use_fallback"; then
+        echo -e "${GREEN}[OK]${NC} Downloaded big.txt"
+    else
+        echo -e "${YELLOW}[FALLBACK]${NC} Using alternative source for big.txt"
+        download_wordlist "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/big.txt" "$wordlist_dir/big.txt" "$use_fallback" || create_minimal_big "$wordlist_dir/big.txt" "$use_fallback"
+    fi
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Wordlists installation finished"
+}
+
+check_and_install_tools() {
+    local scan_type="$1"
+    local tools_needed=()
+    local need_wordlists=false
+    
+    case "$scan_type" in
+        "osint")
+            tools_needed=(whois dig)
+            ;;
+        "domain")
+            tools_needed=(openssl)
+            ;;
+        "network")
+            tools_needed=(nmap)
+            ;;
+        "complete")
+            tools_needed=(whois dig nmap openssl)
+            need_wordlists=true
+            ;;
+    esac
+    
+    local missing=()
+    echo -e "${CYAN}[INFO]${NC} Checking required tools for $scan_type scan..."
+    
+    for tool in "${tools_needed[@]}"; do
+        if ! command -v "$tool" &>/dev/null; then
+            missing+=("$tool")
+        fi
+    done
+    
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${YELLOW}[WARNING]${NC} Missing critical tools: ${missing[*]}"
+        read -rp "Install missing tools automatically? [Y/n]: " install_choice
+        
+        if [[ ! "$install_choice" =~ ^[Nn] ]]; then
+            for tool in "${missing[@]}"; do
+                install_missing_tool "$tool"
+            done
+        else
+            echo -e "${RED}[ERROR]${NC} Cannot proceed without required tools"
+            exit 1
+        fi
+    fi
+    
+    # Installer les wordlists si nécessaire
+    if [ "$need_wordlists" = true ] || [ "$scan_type" = "complete" ]; then
+        install_wordlists
+    fi
+    
+    echo -e "${GREEN}[OK]${NC} All required tools are available"
+}
+
+prepare_output() {
+    OUTDIR="security_scan_$(date +'%Y%m%d_%H%M%S')"
+    mkdir -p "$OUTDIR"/{osint,domains,network,web,reports}
+    echo -e "${GREEN}[INFO]${NC} Results directory: ${WHITE}$OUTDIR${NC}"
+}
+
+execute_with_timeout() {
+    local name="$1"
+    local command="$2"
+    local timeout_duration="${3:-300}"
+    local output_file="$4"
+    
+    echo -e "${CYAN}[START]${NC} $name"
+    
+    if timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1; then
+        echo -e "${GREEN}[DONE]${NC} $name"
+        return 0
+    else
+        local exit_code=$?
+        if [ $exit_code -eq 124 ]; then
+            echo -e "${YELLOW}[TIMEOUT]${NC} $name (${timeout_duration}s)"
+        else
+            echo -e "${RED}[ERROR]${NC} $name failed (exit code: $exit_code)"
+        fi
+        return $exit_code
+    fi
+}
+
+show_scan_menu() {
+    echo -e "\n${YELLOW}Select scan type:${NC}"
+    echo -e "${CYAN}1)${NC} OSINT & Information Gathering"
+    echo -e "${CYAN}2)${NC} Domain & Certificate Analysis" 
+    echo -e "${CYAN}3)${NC} Network Port Scanning"
+    echo -e "${CYAN}4)${NC} Complete Assessment (All scans)"
+    echo
+}
+
+run_osint_scans() {
+    local target="$1"
+    local domain="$2"
+    
+    echo -e "\n${RED}[OSINT]${NC} Starting information gathering..."
+    
+    if [ -n "$domain" ]; then
+        execute_with_timeout "WHOIS Lookup" "whois '$domain'" 60 "$OUTDIR/osint/whois.txt"
+        
+        execute_with_timeout "DNS Enumeration" "
+            echo '=== A Records ===' 
+            dig +short '$domain' A
+            echo -e '\n=== MX Records ==='
+            dig +short '$domain' MX
+            echo -e '\n=== NS Records ==='
+            dig +short '$domain' NS
+            echo -e '\n=== TXT Records ==='
+            dig +short '$domain' TXT
+        " 60 "$OUTDIR/osint/dns_enum.txt"
+        
+        if command -v dnsenum &> /dev/null; then
+            execute_with_timeout "DNS Enumeration (Advanced)" "dnsenum '$domain'" 300 "$OUTDIR/osint/dnsenum.txt"
+        fi
+        
+        if command -v dnsrecon &> /dev/null; then
+            execute_with_timeout "DNS Reconnaissance" "dnsrecon -d '$domain' -t std" 300 "$OUTDIR/osint/dnsrecon.txt"
+        fi
+        
+        if command -v theharvester &> /dev/null; then
+            execute_with_timeout "Email Harvesting" "theharvester -d '$domain' -l 100 -b google,bing,yahoo" 300 "$OUTDIR/osint/emails.txt"
+        fi
+    fi
+    
+    if [ -n "$target" ]; then
+        execute_with_timeout "Reverse DNS" "dig +short -x '$target'" 30 "$OUTDIR/osint/reverse_dns.txt"
+    fi
+    
+    echo -e "${GREEN}[COMPLETED]${NC} OSINT scans finished"
+}
+
+run_domain_scans() {
+    local domain="$1"
+    local url="$2"
+    
+    echo -e "\n${RED}[DOMAINS]${NC} Starting domain and certificate analysis..."
+    
+    if [ -n "$domain" ]; then
+        if command -v subfinder &> /dev/null; then
+            execute_with_timeout "Subfinder Discovery" "subfinder -d '$domain' -silent" 300 "$OUTDIR/domains/subdomains_subfinder.txt"
+        fi
+        
+        if command -v amass &> /dev/null; then
+            execute_with_timeout "Amass Enumeration" "amass enum -passive -d '$domain'" 600 "$OUTDIR/domains/subdomains_amass.txt"
+        fi
+        
+        if command -v assetfinder &> /dev/null; then
+            execute_with_timeout "Assetfinder Discovery" "assetfinder '$domain'" 300 "$OUTDIR/domains/subdomains_assetfinder.txt"
+        fi
+        
+        execute_with_timeout "SSL Certificate Analysis" "echo | openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | openssl x509 -text" 30 "$OUTDIR/domains/ssl_cert.txt"
+        
+        if command -v sslscan &> /dev/null; then
+            execute_with_timeout "SSL Configuration Scan" "sslscan '$domain'" 300 "$OUTDIR/domains/sslscan.txt"
+        fi
+    fi
+    
+    if [ -n "$url" ]; then
+        if command -v whatweb &> /dev/null; then
+            execute_with_timeout "Technology Detection" "whatweb '$url' -v" 300 "$OUTDIR/domains/whatweb.txt"
+        fi
+        
+        if command -v wafw00f &> /dev/null; then
+            execute_with_timeout "WAF Detection" "wafw00f '$url'" 60 "$OUTDIR/domains/wafw00f.txt"
+        fi
+    fi
+    
+    # Consolider les sous-domaines
+    if ls "$OUTDIR/domains"/subdomains_*.txt 1> /dev/null 2>&1; then
+        echo -e "${CYAN}[INFO]${NC} Consolidating subdomain results..."
+        cat "$OUTDIR/domains"/subdomains_*.txt 2>/dev/null | sort -u > "$OUTDIR/domains/all_subdomains.txt"
+    fi
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Domain scans finished"
+}
+
+run_network_scans() {
+    local target="$1"
+    
+    echo -e "\n${RED}[NETWORK]${NC} Starting network port scanning..."
+    
+    execute_with_timeout "Nmap Fast Scan" "nmap -n -T5 --top-ports 1000 --min-rate=5000 '$target'" 300 "$OUTDIR/network/nmap_fast.txt"
+    
+    execute_with_timeout "Nmap Full TCP Scan" "nmap -n -T4 -p- -sS -sV -sC '$target'" 1800 "$OUTDIR/network/nmap_full.txt"
+    
+    execute_with_timeout "Nmap UDP Scan" "nmap -n -T4 --top-ports 100 -sU '$target'" 600 "$OUTDIR/network/nmap_udp.txt"
+    
+    if command -v masscan &> /dev/null; then
+        execute_with_timeout "Masscan Ultra-Fast" "masscan '$target' -p1-65535 --rate=50000" 300 "$OUTDIR/network/masscan.txt"
+    fi
+    
+    if command -v unicornscan &> /dev/null; then
+        execute_with_timeout "Unicornscan TCP" "unicornscan -mT '$target':1-65535" 600 "$OUTDIR/network/unicornscan_tcp.txt"
+    fi
+    
+    execute_with_timeout "OS Fingerprinting" "nmap -n -O '$target'" 300 "$OUTDIR/network/nmap_os.txt"
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Network scans finished"
+}
+
+run_web_scans() {
+    local url="$1"
+    
+    echo -e "\n${RED}[WEB]${NC} Starting web application testing..."
+    
+    local wordlist_dir="/usr/share/wordlists/dirb"
+    local fallback_dir="$HOME/.local/share/wordlists/dirb"
+    
+    # Déterminer quel répertoire de wordlists utiliser
+    if [ -f "$wordlist_dir/common.txt" ]; then
+        local common_wordlist="$wordlist_dir/common.txt"
+        local big_wordlist="$wordlist_dir/big.txt"
+    elif [ -f "$fallback_dir/common.txt" ]; then
+        local common_wordlist="$fallback_dir/common.txt"
+        local big_wordlist="$fallback_dir/big.txt"
+    else
+        echo -e "${RED}[ERROR]${NC} No wordlists found. Run complete scan to install them."
+        return 1
+    fi
+    
+    if command -v gobuster &> /dev/null; then
+        execute_with_timeout "Directory Enumeration (Common)" "gobuster dir -u '$url' -w '$common_wordlist' -t 50 -x php,html,txt,js" 600 "$OUTDIR/web/gobuster_common.txt"
+        
+        execute_with_timeout "Directory Enumeration (Big)" "gobuster dir -u '$url' -w '$big_wordlist' -t 30 -x php,html,txt" 900 "$OUTDIR/web/gobuster_big.txt"
+    fi
+    
+    if command -v dirb &> /dev/null; then
+        execute_with_timeout "Dirb Enumeration" "dirb '$url' '$common_wordlist'" 600 "$OUTDIR/web/dirb.txt"
+    fi
+    
+    if command -v nikto &> /dev/null; then
+        execute_with_timeout "Nikto Vulnerability Scan" "nikto -h '$url'" 600 "$OUTDIR/web/nikto.txt"
+    fi
+    
+    if command -v nuclei &> /dev/null; then
+        local template_dirs=(
+            "$HOME/nuclei-templates"
+            "$HOME/.local/share/nuclei-templates"
+            "/usr/share/nuclei-templates"
+            "$(go env GOPATH)/pkg/mod/github.com/projectdiscovery/nuclei-templates*"
+        )
+        
+        local template_dir=""
+        for dir in "${template_dirs[@]}"; do
+            if [ -d "$dir" ]; then
+                template_dir="$dir"
+                break
+            fi
+        done
+        
+        if [ -n "$template_dir" ]; then
+            execute_with_timeout "Nuclei Templates" "nuclei -u '$url' -t '$template_dir/'" 600 "$OUTDIR/web/nuclei.txt"
+        else
+            execute_with_timeout "Nuclei Basic" "nuclei -u '$url'" 300 "$OUTDIR/web/nuclei.txt"
+        fi
+    fi
+    
+    if command -v sqlmap &> /dev/null; then
+        mkdir -p "$OUTDIR/web/sqlmap"
+        execute_with_timeout "SQL Injection Testing" "sqlmap -u '$url' --batch --level=2 --risk=1 --output-dir='$OUTDIR/web/sqlmap'" 600 "$OUTDIR/web/sqlmap.log"
+    fi
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Web scans finished"
 }
 
 generate_clean_report() {
@@ -708,7 +805,6 @@ generate_clean_report() {
     echo -e "${GREEN}[REPORT]${NC} Executive summary: ${WHITE}$report_file${NC}"
 }
 
-# Main execution
 main() {
     # Parse arguments
     case "${1:-}" in
@@ -773,3 +869,10 @@ main() {
     echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║                              SCAN COMPLETED                                  ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${WHITE}Results saved in:${NC} ${CYAN}$OUTDIR${NC}"
+    echo -e "${WHITE}Executive summary:${NC} ${CYAN}$OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "\n${YELLOW}Thank you for using Security Scanner!${NC}"
+}
+
+# Execute main function
+main "$@"
