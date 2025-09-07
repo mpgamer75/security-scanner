@@ -1,4 +1,7 @@
-# Security Scanner
+<p align="center">
+  <b><font size="6">Security Scanner</font></b>
+</p>
+
 
 <p align="center">
   <img src="images_readme/logo7.png" alt="Logo" width="250"/>
