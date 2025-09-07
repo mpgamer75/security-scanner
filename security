@@ -289,21 +289,21 @@ run_domain_scans() {
     echo -e "\n${RED}[DOMAINS]${NC} Starting domain and certificate analysis..."
     
     if [ -n "$domain" ]; then
-        start_process "Subfinder Discovery" "subfinder -d '$domain' -silent -o '$OUTDIR/domains/subdomains_subfinder.txt'"
+        start_process "Subfinder Discovery" "timeout 300 subfinder -d '$domain' -silent -o '$OUTDIR/domains/subdomains_subfinder.txt'"
         
-        start_process "Amass Enumeration" "amass enum -passive -d '$domain' -o '$OUTDIR/domains/subdomains_amass.txt' 2>/dev/null"
+        start_process "Amass Enumeration" "timeout 600 amass enum -passive -d '$domain' -o '$OUTDIR/domains/subdomains_amass.txt' 2>/dev/null"
         
-        start_process "Assetfinder Discovery" "assetfinder '$domain' > '$OUTDIR/domains/subdomains_assetfinder.txt' 2>/dev/null"
+        start_process "Assetfinder Discovery" "timeout 300 assetfinder '$domain' > '$OUTDIR/domains/subdomains_assetfinder.txt' 2>/dev/null"
         
-        start_process "SSL Certificate Analysis" "echo | openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | openssl x509 -text > '$OUTDIR/domains/ssl_cert.txt' 2>/dev/null"
+        start_process "SSL Certificate Analysis" "timeout 30 sh -c \"echo | openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | openssl x509 -text > '$OUTDIR/domains/ssl_cert.txt' 2>/dev/null\""
         
-        start_process "SSL Configuration Scan" "sslscan '$domain' > '$OUTDIR/domains/sslscan.txt' 2>/dev/null"
+        start_process "SSL Configuration Scan" "timeout 300 sslscan '$domain' > '$OUTDIR/domains/sslscan.txt' 2>/dev/null"
     fi
     
     if [ -n "$url" ]; then
-        start_process "Technology Detection" "whatweb '$url' -v > '$OUTDIR/domains/whatweb.txt' 2>/dev/null"
+        start_process "Technology Detection" "timeout 300 whatweb '$url' -v > '$OUTDIR/domains/whatweb.txt' 2>/dev/null"
         
-        start_process "WAF Detection" "wafw00f '$url' > '$OUTDIR/domains/wafw00f.txt' 2>/dev/null"
+        start_process "WAF Detection" "timeout 60 wafw00f '$url' > '$OUTDIR/domains/wafw00f.txt' 2>/dev/null"
     fi
     
     monitor_processes
