@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Couleurs pour l'affichage
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -9,7 +10,29 @@ WHITE='\033[1;37m'
 GRAY='\033[0;90m'
 NC='\033[0m'
 
-════════════════════════════════════════════════════════════════${NC}"
+display_install_banner() {
+    clear
+    echo -e "${RED}"
+    cat << "EOF"
+    ███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗
+    ██╔════╝██╔════╝██╔════╝██║   ██║██╔══██╗██║╚══██╔══╝╚██╗ ██╔╝
+    ███████╗█████╗  ██║     ██║   ██║██████╔╝██║   ██║    ╚████╔╝ 
+    ╚════██║██╔══╝  ██║     ██║   ██║██╔══██╗██║   ██║     ╚██╔╝  
+    ███████║███████╗╚██████╗╚██████╔╝██║  ██║██║   ██║      ██║   
+    ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝   
+                                                                   
+    ███████╗ ██████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗ 
+    ██╔════╝██╔════╝██╔══██╗████╗  ██║████╗  ██║██╔════╝██╔══██╗
+    ███████╗██║     ███████║██╔██╗ ██║██╔██╗ ██║█████╗  ██████╔╝
+    ╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗
+    ███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║
+    ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
+EOF
+    echo -e "${NC}"
+    echo "================================================================"
+    echo -e "${WHITE}                      INSTALLATION SCRIPT${NC}"
+    echo -e "${CYAN}                         Version 2.0.0${NC}"
+    echo "================================================================"
     echo
 }
 
@@ -31,7 +54,7 @@ check_system() {
 install_tools() {
     echo -e "${CYAN}[INFO]${NC} Checking required tools..."
     
-    local tools=(nmap masscan subfinder gobuster sqlmap theharvester whois nikto whatweb nuclei dig openssl curl wget git)
+    local tools=(nmap masscan gobuster sqlmap whois nikto whatweb dig openssl curl wget git)
     local missing=()
     
     for tool in "${tools[@]}"; do
@@ -59,7 +82,17 @@ install_tools() {
         sudo apt update
         sudo apt install -y "${missing[@]}"
         
-        # Install Go tools
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y "${missing[@]}"
+        
+    elif command -v pacman &> /dev/null; then
+        sudo pacman -S --noconfirm "${missing[@]}"
+    fi
+    
+    # Install Go tools if Go is available
+    if command -v go &> /dev/null; then
+        echo -e "${CYAN}[INFO]${NC} Installing Go-based tools..."
+        
         if ! command -v subfinder &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing subfinder..."
             go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
@@ -70,11 +103,12 @@ install_tools() {
             go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
         fi
         
-    elif command -v yum &> /dev/null; then
-        sudo yum install -y "${missing[@]}"
-        
-    elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm "${missing[@]}"
+        if ! command -v amass &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing amass..."
+            go install -v github.com/OWASP/Amass/v3/...@master
+        fi
+    else
+        echo -e "${YELLOW}[WARNING]${NC} Go not found. Some tools (subfinder, nuclei, amass) will not be installed."
     fi
     
     echo -e "${GREEN}[OK]${NC} Tools installation completed"
@@ -89,12 +123,6 @@ download_wordlists() {
         sudo mkdir -p "$wordlist_dir"
     fi
     
-    # Download SecLists if not present
-    if [ ! -d "$wordlist_dir/SecLists" ]; then
-        echo -e "${CYAN}[INFO]${NC} Downloading SecLists wordlists..."
-        sudo git clone https://github.com/danielmiessler/SecLists.git "$wordlist_dir/SecLists"
-    fi
-    
     # Ensure dirb wordlists exist
     if [ ! -d "$wordlist_dir/dirb" ]; then
         echo -e "${CYAN}[INFO]${NC} Setting up dirb wordlists..."
@@ -102,11 +130,13 @@ download_wordlists() {
         
         # Create basic wordlist if dirb package didn't install them
         if [ ! -f "$wordlist_dir/dirb/common.txt" ]; then
-            sudo wget -O "$wordlist_dir/dirb/common.txt" https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt
+            echo -e "${CYAN}[INFO]${NC} Downloading common.txt..."
+            sudo wget -q -O "$wordlist_dir/dirb/common.txt" "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt" 2>/dev/null || echo "admin" | sudo tee "$wordlist_dir/dirb/common.txt" > /dev/null
         fi
         
         if [ ! -f "$wordlist_dir/dirb/big.txt" ]; then
-            sudo wget -O "$wordlist_dir/dirb/big.txt" https://raw.githubusercontent.com/v0re/dirb/master/wordlists/big.txt
+            echo -e "${CYAN}[INFO]${NC} Downloading big.txt..."
+            sudo wget -q -O "$wordlist_dir/dirb/big.txt" "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/big.txt" 2>/dev/null || echo "admin" | sudo tee "$wordlist_dir/dirb/big.txt" > /dev/null
         fi
     fi
     
@@ -117,7 +147,7 @@ install_nuclei_templates() {
     echo -e "${CYAN}[INFO]${NC} Setting up Nuclei templates..."
     
     if command -v nuclei &> /dev/null; then
-        nuclei -update-templates
+        nuclei -update-templates &> /dev/null
         echo -e "${GREEN}[OK]${NC} Nuclei templates updated"
     else
         echo -e "${YELLOW}[WARNING]${NC} Nuclei not found, skipping template update"
@@ -125,7 +155,7 @@ install_nuclei_templates() {
 }
 
 install_scanner() {
-    echo -e "${CYAN}[INFO]${NC} Installing RedHack Recon scanner..."
+    echo -e "${CYAN}[INFO]${NC} Installing Security Scanner..."
     
     # Download the main script
     curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/security -o security
@@ -142,7 +172,7 @@ install_scanner() {
     sudo mv security /usr/local/bin/
     
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[SUCCESS]${NC} RedHack Recon installed successfully!"
+        echo -e "${GREEN}[SUCCESS]${NC} Security Scanner installed successfully!"
         echo -e "${WHITE}You can now run:${NC} ${CYAN}security${NC}"
     else
         echo -e "${RED}[ERROR]${NC} Installation failed"
@@ -154,7 +184,8 @@ create_desktop_entry() {
     read -rp "Create desktop entry? [y/N]: " desktop_choice
     
     if [[ "$desktop_choice" =~ ^[Yy] ]]; then
-        cat > ~/.local/share/applications/security-scanner.desktop << EOF
+        mkdir -p ~/.local/share/applications
+        cat > ~/.local/share/applications/security-scanner.desktop << 'EOF'
 [Desktop Entry]
 Version=1.0
 Type=Application
@@ -179,9 +210,9 @@ main() {
     create_desktop_entry
     
     echo
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo "================================================================"
     echo -e "${GREEN}                     INSTALLATION COMPLETED${NC}"
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo "================================================================"
     echo -e "${WHITE}Usage:${NC}"
     echo -e "  ${CYAN}security${NC}           # Start interactive scanner"
     echo -e "  ${CYAN}security --help${NC}    # Show help information"
@@ -191,4 +222,5 @@ main() {
     echo
 }
 
+# Execute main function
 main "$@"
