@@ -157,6 +157,7 @@ install_missing_tool() {
 check_and_install_tools() {
     local scan_type="$1"
     local tools_needed=()
+    local need_wordlists=false
     
     case "$scan_type" in
         "osint")
@@ -173,6 +174,7 @@ check_and_install_tools() {
             ;;
         "complete")
             tools_needed=(whois dig nmap openssl)
+            need_wordlists=true
             # Les autres outils sont optionnels
             ;;
     esac
@@ -198,6 +200,11 @@ check_and_install_tools() {
             echo -e "${RED}[ERROR]${NC} Cannot proceed without required tools"
             exit 1
         fi
+    fi
+    
+    # Installer les wordlists si nécessaire
+    if [ "$need_wordlists" = true ] || [ "$scan_type" = "complete" ]; then
+        install_wordlists
     fi
     
     echo -e "${GREEN}[OK]${NC} All required tools are available"
@@ -766,6 +773,3 @@ main() {
     echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║                              SCAN COMPLETED                                  ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e "${CYAN}Results saved in:${NC} ${WHITE}$OUTDIR${NC}"
-    echo -e "${CYAN}Executive Summary:${NC} ${WHITE}$OUTDIR/re
-
