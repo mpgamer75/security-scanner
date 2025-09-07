@@ -43,12 +43,12 @@ confirm_uninstall() {
     echo "  - Desktop entry (~/.local/share/applications/security-scanner.desktop)"
     echo "  - Configuration files (if any)"
     echo
-    echo -e "${RED}Note: Scan results and wordlists will NOT be removed.${NC}"
+    echo -e "${RED}Note: Scan results and wordlists will NOT be removed by default.${NC}"
     echo
     
     read -rp "Are you sure you want to uninstall Security Scanner? [y/N]: " confirm
     
-    if [[ ! "$confirm" =~ ^[Yy] ]]; then
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo -e "${CYAN}[INFO]${NC} Uninstallation cancelled by user."
         exit 0
     fi
@@ -58,8 +58,7 @@ remove_executable() {
     echo -e "${CYAN}[INFO]${NC} Removing Security Scanner executable..."
     
     if [ -f "/usr/local/bin/security" ]; then
-        sudo rm -f /usr/local/bin/security
-        if [ $? -eq 0 ]; then
+        if sudo rm -f /usr/local/bin/security; then
             echo -e "${GREEN}[OK]${NC} Executable removed from /usr/local/bin/security"
         else
             echo -e "${RED}[ERROR]${NC} Failed to remove executable"
@@ -74,8 +73,7 @@ remove_desktop_entry() {
     echo -e "${CYAN}[INFO]${NC} Removing desktop entry..."
     
     if [ -f "$HOME/.local/share/applications/security-scanner.desktop" ]; then
-        rm -f "$HOME/.local/share/applications/security-scanner.desktop"
-        if [ $? -eq 0 ]; then
+        if rm -f "$HOME/.local/share/applications/security-scanner.desktop"; then
             echo -e "${GREEN}[OK]${NC} Desktop entry removed"
         else
             echo -e "${RED}[ERROR]${NC} Failed to remove desktop entry"
@@ -93,15 +91,37 @@ remove_go_tools() {
     
     read -rp "Remove Go-based security tools (subfinder, nuclei, amass)? [y/N]: " remove_go
     
-    if [[ "$remove_go" =~ ^[Yy] ]]; then
+    if [[ "$remove_go" =~ ^[Yy]$ ]]; then
         if command -v go &> /dev/null; then
             local gopath=$(go env GOPATH)
+            local gobin=$(go env GOBIN)
+            
+            # Chercher dans GOBIN d'abord, puis GOPATH/bin
+            local bin_paths=()
+            [ -n "$gobin" ] && bin_paths+=("$gobin")
+            [ -n "$gopath" ] && bin_paths+=("$gopath/bin")
+            bin_paths+=("$HOME/go/bin")
             
             for tool in "${go_tools[@]}"; do
-                if [ -f "$gopath/bin/$tool" ]; then
-                    rm -f "$gopath/bin/$tool"
-                    removed_tools+=("$tool")
-                    echo -e "${GREEN}[OK]${NC} Removed $tool"
+                local found=false
+                for bin_path in "${bin_paths[@]}"; do
+                    if [ -f "$bin_path/$tool" ]; then
+                        rm -f "$bin_path/$tool"
+                        removed_tools+=("$tool")
+                        echo -e "${GREEN}[OK]${NC} Removed $tool from $bin_path"
+                        found=true
+                        break
+                    fi
+                done
+                
+                if [ "$found" = false ]; then
+                    # Chercher dans PATH
+                    local tool_path=$(which "$tool" 2>/dev/null)
+                    if [ -n "$tool_path" ] && [[ "$tool_path" == *"/go/"* ]]; then
+                        rm -f "$tool_path"
+                        removed_tools+=("$tool")
+                        echo -e "${GREEN}[OK]${NC} Removed $tool from $tool_path"
+                    fi
                 fi
             done
             
@@ -131,7 +151,7 @@ clean_scan_results() {
         
         read -rp "Remove all scan result directories? [y/N]: " remove_scans
         
-        if [[ "$remove_scans" =~ ^[Yy] ]]; then
+        if [[ "$remove_scans" =~ ^[Yy]$ ]]; then
             for dir in "${scan_dirs[@]}"; do
                 rm -rf "$dir"
                 echo -e "${GREEN}[OK]${NC} Removed $dir"
@@ -140,7 +160,7 @@ clean_scan_results() {
             echo -e "${YELLOW}[SKIP]${NC} Scan results preserved"
         fi
     else
-        echo -e "${YELLOW}[INFO]${NC} No scan result directories found"
+        echo -e "${YELLOW}[INFO]${NC} No scan result directories found in current directory"
     fi
 }
 
@@ -169,7 +189,7 @@ remove_config_files() {
         
         read -rp "Remove configuration files? [y/N]: " remove_configs
         
-        if [[ "$remove_configs" =~ ^[Yy] ]]; then
+        if [[ "$remove_configs" =~ ^[Yy]$ ]]; then
             for config in "${found_configs[@]}"; do
                 if [[ "$config" == "/etc/security-scanner" ]]; then
                     sudo rm -rf "$config"
@@ -183,6 +203,53 @@ remove_config_files() {
         fi
     else
         echo -e "${YELLOW}[INFO]${NC} No configuration files found"
+    fi
+}
+
+remove_custom_wordlists() {
+    echo -e "${CYAN}[INFO]${NC} Checking for custom wordlists..."
+    
+    local wordlist_locations=(
+        "$HOME/.local/share/wordlists/dirb"
+        "/usr/share/wordlists/dirb"
+    )
+    
+    local found_wordlists=()
+    
+    for location in "${wordlist_locations[@]}"; do
+        if [ -d "$location" ]; then
+            # Vérifier si ce sont nos wordlists créées (petites tailles)
+            if [ -f "$location/common.txt" ]; then
+                local size=$(stat -c%s "$location/common.txt" 2>/dev/null || echo "0")
+                if [ "$size" -lt 1000 ]; then  # Moins de 1KB = probablement nos wordlists de base
+                    found_wordlists+=("$location")
+                fi
+            fi
+        fi
+    done
+    
+    if [ ${#found_wordlists[@]} -gt 0 ]; then
+        echo -e "${YELLOW}[FOUND]${NC} Found custom wordlist directories:"
+        for wordlist in "${found_wordlists[@]}"; do
+            echo "  - $wordlist"
+        done
+        
+        read -rp "Remove custom wordlist directories? [y/N]: " remove_wordlists
+        
+        if [[ "$remove_wordlists" =~ ^[Yy]$ ]]; then
+            for wordlist in "${found_wordlists[@]}"; do
+                if [[ "$wordlist" == "/usr/share/wordlists/dirb" ]]; then
+                    sudo rm -rf "$wordlist"
+                else
+                    rm -rf "$wordlist"
+                fi
+                echo -e "${GREEN}[OK]${NC} Removed $wordlist"
+            done
+        else
+            echo -e "${YELLOW}[SKIP]${NC} Wordlist directories preserved"
+        fi
+    else
+        echo -e "${YELLOW}[INFO]${NC} No custom wordlist directories found"
     fi
 }
 
@@ -207,6 +274,7 @@ main() {
     remove_go_tools
     clean_scan_results
     remove_config_files
+    remove_wordlists
     
     echo
     echo "================================================================"
