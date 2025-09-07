@@ -1,7 +1,3 @@
-<p align="center">
-  <b><font size="30">Security Scanner</font></b>
-</p>
-
 
 <p align="center">
   <img src="images_readme/logo7.png" alt="Logo" width="250"/>
@@ -14,7 +10,7 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-Un outil de reconnaissance et d'évaluation de sécurité avancé qui automatise les phases d'OSINT, de reconnaissance réseau et de test d'applications web. Conçu pour les professionnels de la cybersécurité, les pentesters et les bug hunters.
+**Security Scanner** : un outil de reconnaissance et d'évaluation de sécurité avancé qui automatise les phases d'OSINT, de reconnaissance réseau et de test d'applications web. Conçu pour les professionnels de la cybersécurité, les pentesters et les bug hunters.
 
 ## Installation
 
