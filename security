@@ -833,9 +833,9 @@ generate_clean_report() {
         fi
         
         # Afficher les services critiques détectés
-        if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
+        if [ -f "$OUTDIR/network/nmap_common.txt" ]; then
             echo "│  Critical Services:"
-            grep -E "(ssh|ftp|telnet|http|https|smtp|pop|imap|ldap|mysql|postgresql|oracle|mssql|vnc|rdp)" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -5 | while read line; do
+            grep -E "(ssh|ftp|telnet|http|https|smtp|pop|imap|ldap|mysql|postgresql|oracle|mssql|vnc|rdp)" "$OUTDIR/network/nmap_common.txt" 2>/dev/null | head -5 | while read line; do
                 echo "│    - $line"
             done
         fi
