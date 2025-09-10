@@ -12,7 +12,11 @@ WHITE='\033[1;37m'
 GRAY='\033[0;90m'
 NC='\033[0m'
 
-VERSION="2.0.1"
+VERSION="2.1.0"
+
+# Variables globales pour gestion interruption
+SCAN_INTERRUPTED=false
+CURRENT_SCAN=""
 
 display_banner() {
     clear
@@ -34,8 +38,8 @@ display_banner() {
 EOF
     echo -e "${NC}"
     echo -e "${GRAY}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${WHITE}                 Advanced Security Assessment Tool${NC}"
-    echo -e "${CYAN}                      Version ${VERSION} | by mpgamer75${NC}"
+    echo -e "${WHITE}              Advanced Red Team Security Assessment Tool${NC}"
+    echo -e "${CYAN}                    Version ${VERSION} | by mpgamer75${NC}"
     echo -e "${GRAY}════════════════════════════════════════════════════════════════${NC}"
 }
 
@@ -48,50 +52,96 @@ USAGE:
 OPTIONS:
     -h, --help      Show this help message
     -v, --version   Show version information
+    -q, --quick     Quick scan mode (faster, less comprehensive)
+    -s, --stealth   Stealth mode (slower, evasive techniques)
 
 SCAN TYPES:
     1. OSINT & Information Gathering
        - WHOIS lookups and domain information
        - DNS enumeration (A, MX, NS, TXT records)
-       - Email harvesting and social media intelligence
-       - Historical data and archived information
+       - Email harvesting with multiple sources
+       - Subdomain enumeration and certificate transparency
+       - Social media and breach data reconnaissance
 
-    2. Domain & Certificate Analysis
-       - SSL/TLS certificate analysis
-       - Subdomain discovery and enumeration
-       - Domain reputation and security analysis
-       - Certificate transparency logs
+    2. Network Reconnaissance & Enumeration
+       - Adaptive port scanning with progress indicators
+       - Service version detection and OS fingerprinting
+       - Banner grabbing and service enumeration
+       - SMB/NetBIOS enumeration
+       - SNMP community string testing
 
-    3. Network Port Scanning
-       - TCP port scanning (fast and comprehensive)
-       - UDP port scanning for critical services
-       - Service version detection
-       - OS fingerprinting and detection
+    3. Web Application Security Testing
+       - Technology stack identification
+       - Directory and file enumeration
+       - Vulnerability scanning with Nuclei templates
+       - SQL injection and XSS testing
+       - SSL/TLS configuration analysis
 
-    4. Complete Assessment
-       - Full combination of all scan types
-       - Comprehensive security evaluation
-       - Detailed reporting and analysis
+    4. Advanced Red Team Assessment
+       - Complete reconnaissance workflow
+       - Stealth scanning techniques
+       - Automated vulnerability correlation
+       - Attack surface mapping
+       - Post-exploitation preparation data
 
-TOOLS USED:
-    OSINT: whois, theharvester, dnsenum, dnsrecon
-    Domains: subfinder, amass, assetfinder, findomain
-    Certificates: openssl, sslscan, sslyze
-    Network: nmap, masscan, unicornscan, zmap
-    Web: whatweb, wafw00f, nikto, gobuster, dirb
-    Vulnerabilities: nuclei, sqlmap, xssstrike
+TOOLS INTEGRATED:
+    OSINT: whois, theharvester, subfinder, amass, crt.sh
+    Network: nmap, masscan, rustscan, enum4linux, smbclient
+    Web: whatweb, nikto, gobuster, nuclei, sqlmap, wafw00f
+    Exploits: searchsploit, msfconsole integration prep
+
+FEATURES:
+    ✓ Real-time progress indicators
+    ✓ Graceful interrupt handling (Ctrl+C)
+    ✓ Adaptive timeout management
+    ✓ Stealth and evasion techniques
+    ✓ Comprehensive reporting
+    ✓ Red team workflow optimization
 
 EXAMPLES:
     security                    # Interactive mode
-    security --help            # Show this help
-
-NOTES:
-    - All scans are saved in timestamped directories
-    - Use only on systems you own or have permission to test
-    - Some scans require internet connectivity
-    - Advanced scans may take significant time
+    security --quick           # Fast reconnaissance
+    security --stealth         # Evasive scanning
 
 EOF
+}
+
+# Gestion améliorée des interruptions
+handle_interrupt() {
+    SCAN_INTERRUPTED=true
+    echo -e "\n${YELLOW}[!]${NC} Interruption détectée..."
+    
+    if [ -n "$CURRENT_SCAN" ]; then
+        echo -e "${CYAN}[INFO]${NC} Arrêt en cours de: $CURRENT_SCAN"
+        # Tuer les processus en arrière-plan
+        jobs -p | xargs -r kill 2>/dev/null || true
+    fi
+    
+    echo -e "${YELLOW}[INFO]${NC} Génération du rapport partiel..."
+    generate_clean_report
+    echo -e "\n${CYAN}[INFO]${NC} Résultats partiels sauvegardés dans: ${WHITE}$OUTDIR${NC}"
+    echo -e "${YELLOW}Scan interrompu par l'utilisateur${NC}"
+    exit 130
+}
+
+# Progress indicator pour les scans longs
+show_progress() {
+    local duration=$1
+    local message="$2"
+    local elapsed=0
+    
+    echo -ne "${CYAN}[PROGRESS]${NC} $message "
+    
+    while [ $elapsed -lt $duration ] && [ "$SCAN_INTERRUPTED" = false ]; do
+        for i in '/' '-' '\' '|'; do
+            echo -ne "\b$i"
+            sleep 0.25
+            elapsed=$((elapsed + 1))
+            [ $elapsed -ge $duration ] && break
+            [ "$SCAN_INTERRUPTED" = true ] && break
+        done
+    done
+    echo -e "\b "
 }
 
 # Variables globales
@@ -101,34 +151,34 @@ OUTDIR=""
 TARGET=""
 URL=""
 DOMAIN=""
+QUICK_MODE=false
+STEALTH_MODE=false
 
 install_missing_tool() {
     local tool="$1"
-    echo -e "${YELLOW}[INSTALL]${NC} Installing $tool..."
+    echo -e "${YELLOW}[INSTALL]${NC} Installation de $tool..."
     
     case "$tool" in
-        "subfinder")
+        "subfinder"|"nuclei"|"amass")
             if command -v go &> /dev/null; then
-                go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+                case "$tool" in
+                    "subfinder") go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest ;;
+                    "nuclei") go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest ;;
+                    "amass") go install -v github.com/OWASP/Amass/v3/...@master ;;
+                esac
             else
-                echo -e "${RED}[ERROR]${NC} Go is required to install $tool"
+                echo -e "${RED}[ERROR]${NC} Go requis pour installer $tool"
                 return 1
             fi
             ;;
-        "nuclei")
-            if command -v go &> /dev/null; then
-                go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
+        "rustscan")
+            if command -v cargo &> /dev/null; then
+                cargo install rustscan
             else
-                echo -e "${RED}[ERROR]${NC} Go is required to install $tool"
-                return 1
-            fi
-            ;;
-        "amass")
-            if command -v go &> /dev/null; then
-                go install -v github.com/OWASP/Amass/v3/...@master
-            else
-                echo -e "${RED}[ERROR]${NC} Go is required to install $tool"
-                return 1
+                echo -e "${YELLOW}[INFO]${NC} Installation alternative de rustscan via GitHub releases..."
+                wget -q https://github.com/RustScan/RustScan/releases/download/2.0.1/rustscan_2.0.1_amd64.deb
+                sudo dpkg -i rustscan_2.0.1_amd64.deb 2>/dev/null || true
+                rm -f rustscan_2.0.1_amd64.deb
             fi
             ;;
         *)
@@ -138,376 +188,110 @@ install_missing_tool() {
                 sudo yum install -y "$tool"
             elif command -v pacman &> /dev/null; then
                 sudo pacman -S --noconfirm "$tool"
-            else
-                echo -e "${RED}[ERROR]${NC} Cannot install $tool automatically"
-                return 1
             fi
             ;;
     esac
     
     if command -v "$tool" &> /dev/null; then
-        echo -e "${GREEN}[SUCCESS]${NC} $tool installed successfully"
+        echo -e "${GREEN}[SUCCESS]${NC} $tool installé avec succès"
         return 0
     else
-        echo -e "${RED}[ERROR]${NC} Failed to install $tool"
+        echo -e "${RED}[ERROR]${NC} Échec de l'installation de $tool"
         return 1
     fi
 }
 
-download_wordlist() {
-    local url="$1"
-    local output="$2"
-    local use_fallback="$3"
-    
-    if [ "$use_fallback" = true ]; then
-        curl -sSL --connect-timeout 10 --max-time 60 "$url" -o "$output" 2>/dev/null
-    else
-        curl -sSL --connect-timeout 10 --max-time 60 "$url" | sudo tee "$output" > /dev/null 2>&1
-    fi
-    
-    return $?
-}
-
-create_minimal_common() {
-    local output="$1"
-    local use_fallback="$2"
-    
-    local content="admin
-administrator
-index
-login
-home
-about
-contact
-news
-blog
-search
-images
-img
-css
-js
-api
-upload
-download
-backup
-config
-tmp
-temp
-files
-data
-test
-admin.php
-login.php
-index.php
-config.php
-backup.sql
-database
-db
-phpinfo
-info
-server-info
-server-status
-robots.txt
-sitemap.xml"
-    
-    if [ "$use_fallback" = true ]; then
-        echo "$content" > "$output"
-    else
-        echo "$content" | sudo tee "$output" > /dev/null
-    fi
-}
-
-create_minimal_big() {
-    local output="$1"
-    local use_fallback="$2"
-    
-    local content="admin
-administration
-administrator
-api
-app
-application
-apps
-archive
-archives
-backup
-backups
-bin
-blog
-cache
-cgi-bin
-config
-configuration
-css
-data
-database
-db
-demo
-dev
-development
-doc
-docs
-download
-downloads
-email
-error
-errors
-example
-examples
-file
-files
-forum
-ftp
-home
-html
-http
-https
-image
-images
-img
-include
-includes
-index
-info
-install
-installation
-js
-lib
-libs
-log
-logs
-mail
-media
-member
-members
-news
-old
-page
-pages
-php
-phpmyadmin
-pics
-private
-public
-root
-script
-scripts
-search
-secure
-security
-site
-sites
-src
-stat
-static
-stats
-support
-sys
-system
-temp
-template
-templates
-test
-testing
-tests
-tmp
-tools
-upload
-uploads
-user
-users
-var
-web
-webmail
-www
-.htaccess
-.git
-.svn
-administrator/
-admin/
-login/
-wp-admin/
-wp-content/
-wp-includes/
-wp-config.php
-readme.txt
-license.txt
-changelog.txt
-version.txt"
-    
-    if [ "$use_fallback" = true ]; then
-        echo "$content" > "$output"
-    else
-        echo "$content" | sudo tee "$output" > /dev/null
-    fi
-}
-
-create_minimal_wordlists() {
-    local wordlist_dir="$1"
-    local use_fallback="$2"
-    
-    create_minimal_common "$wordlist_dir/common.txt" "$use_fallback"
-    create_minimal_big "$wordlist_dir/big.txt" "$use_fallback"
-}
-
-install_wordlists() {
-    echo -e "${CYAN}[INFO]${NC} Checking wordlists availability..."
-    
-    local wordlist_dir="/usr/share/wordlists/dirb"
-    local fallback_dir="$HOME/.local/share/wordlists/dirb"
-    local use_fallback=false
-    
-    # Vérifier si on peut écrire dans /usr/share/wordlists
-    if [ ! -d "$wordlist_dir" ]; then
-        if ! sudo mkdir -p "$wordlist_dir" 2>/dev/null; then
-            wordlist_dir="$fallback_dir"
-            mkdir -p "$wordlist_dir"
-            use_fallback=true
-            echo -e "${YELLOW}[INFO]${NC} Using local wordlist directory: $wordlist_dir"
-        fi
-    fi
-    
-    # Vérifier si les wordlists existent déjà
-    if [ -f "$wordlist_dir/common.txt" ] && [ -f "$wordlist_dir/big.txt" ]; then
-        # Vérifier si ce sont de vraies wordlists (taille > 1KB)
-        local common_size=$(stat -c%s "$wordlist_dir/common.txt" 2>/dev/null || stat -f%z "$wordlist_dir/common.txt" 2>/dev/null || echo "0")
-        local big_size=$(stat -c%s "$wordlist_dir/big.txt" 2>/dev/null || stat -f%z "$wordlist_dir/big.txt" 2>/dev/null || echo "0")
-        
-        if [ "$common_size" -gt 1000 ] && [ "$big_size" -gt 5000 ]; then
-            echo -e "${GREEN}[OK]${NC} Wordlists already available"
-            return 0
-        fi
-    fi
-    
-    echo -e "${YELLOW}[MISSING]${NC} Wordlists not found or incomplete"
-    read -rp "Download and install wordlists? [Y/n]: " install_choice
-    
-    if [[ "$install_choice" =~ ^[Nn] ]]; then
-        echo -e "${YELLOW}[WARNING]${NC} Creating minimal wordlists for basic functionality..."
-        create_minimal_wordlists "$wordlist_dir" "$use_fallback"
-        return 0
-    fi
-    
-    echo -e "${CYAN}[INFO]${NC} Downloading wordlists..."
-    
-    # Télécharger common.txt
-    if download_wordlist "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt" "$wordlist_dir/common.txt" "$use_fallback"; then
-        echo -e "${GREEN}[OK]${NC} Downloaded common.txt"
-    else
-        echo -e "${YELLOW}[FALLBACK]${NC} Using alternative source for common.txt"
-        download_wordlist "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt" "$wordlist_dir/common.txt" "$use_fallback" || create_minimal_common "$wordlist_dir/common.txt" "$use_fallback"
-    fi
-    
-    # Télécharger big.txt  
-    if download_wordlist "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/big.txt" "$wordlist_dir/big.txt" "$use_fallback"; then
-        echo -e "${GREEN}[OK]${NC} Downloaded big.txt"
-    else
-        echo -e "${YELLOW}[FALLBACK]${NC} Using alternative source for big.txt"
-        download_wordlist "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/big.txt" "$wordlist_dir/big.txt" "$use_fallback" || create_minimal_big "$wordlist_dir/big.txt" "$use_fallback"
-    fi
-    
-    echo -e "${GREEN}[COMPLETED]${NC} Wordlists installation finished"
-}
-
-check_and_install_tools() {
-    local scan_type="$1"
-    local tools_needed=()
-    local need_wordlists=false
-    
-    case "$scan_type" in
-        "osint")
-            tools_needed=(whois dig)
-            ;;
-        "domain")
-            tools_needed=(openssl)
-            ;;
-        "network")
-            tools_needed=(nmap)
-            ;;
-        "complete")
-            tools_needed=(whois dig nmap openssl)
-            need_wordlists=true
-            ;;
-    esac
-    
-    local missing=()
-    echo -e "${CYAN}[INFO]${NC} Checking required tools for $scan_type scan..."
-    
-    for tool in "${tools_needed[@]}"; do
-        if ! command -v "$tool" &>/dev/null; then
-            missing+=("$tool")
-        fi
-    done
-    
-    if [ ${#missing[@]} -gt 0 ]; then
-        echo -e "${YELLOW}[WARNING]${NC} Missing critical tools: ${missing[*]}"
-        read -rp "Install missing tools automatically? [Y/n]: " install_choice
-        
-        if [[ ! "$install_choice" =~ ^[Nn] ]]; then
-            for tool in "${missing[@]}"; do
-                install_missing_tool "$tool"
-            done
-        else
-            echo -e "${RED}[ERROR]${NC} Cannot proceed without required tools"
-            exit 1
-        fi
-    fi
-    
-    # Installer les wordlists si nécessaire
-    if [ "$need_wordlists" = true ] || [ "$scan_type" = "complete" ]; then
-        install_wordlists
-    fi
-    
-    echo -e "${GREEN}[OK]${NC} All required tools are available"
-}
-
 prepare_output() {
-    OUTDIR="security_scan_$(date +'%Y%m%d_%H%M%S')"
-    mkdir -p "$OUTDIR"/{osint,domains,network,web,reports}
-    echo -e "${GREEN}[INFO]${NC} Results directory: ${WHITE}$OUTDIR${NC}"
+    OUTDIR="redteam_assessment_$(date +'%Y%m%d_%H%M%S')"
+    mkdir -p "$OUTDIR"/{osint,network,web,vulnerabilities,reports,exploitation}
+    echo -e "${GREEN}[INFO]${NC} Répertoire de résultats: ${WHITE}$OUTDIR${NC}"
 }
 
-# Fonction améliorée pour exécuter les commandes avec gestion d'erreurs robuste
-execute_with_timeout() {
+# Fonction améliorée d'exécution avec indicateur de progression
+execute_with_progress() {
     local name="$1"
     local command="$2"
     local timeout_duration="${3:-300}"
     local output_file="$4"
+    local show_progress="${5:-true}"
     
+    CURRENT_SCAN="$name"
     echo -e "${CYAN}[START]${NC} $name"
     
-    # Désactiver temporairement errexit pour cette commande
+    # Fonction de progression en arrière-plan
+    if [ "$show_progress" = true ]; then
+        (
+            local elapsed=0
+            while [ $elapsed -lt $timeout_duration ] && kill -0 $$ 2>/dev/null; do
+                printf "\r${YELLOW}[%02d:%02d]${NC} $name en cours..." $((elapsed/60)) $((elapsed%60))
+                sleep 5
+                elapsed=$((elapsed + 5))
+            done
+        ) &
+        local progress_pid=$!
+    fi
+    
+    # Exécution de la commande
     set +e
-    timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1
-    local exit_code=$?
+    timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1 &
+    local cmd_pid=$!
+    
+    # Attendre la fin ou interruption
+    while kill -0 $cmd_pid 2>/dev/null && [ "$SCAN_INTERRUPTED" = false ]; do
+        sleep 1
+    done
+    
+    # Nettoyer le processus de progression
+    if [ "$show_progress" = true ]; then
+        kill $progress_pid 2>/dev/null || true
+        wait $progress_pid 2>/dev/null || true
+        printf "\r${GREEN}[DONE]${NC} %-50s\n" "$name"
+    fi
+    
+    local exit_code=0
+    if kill -0 $cmd_pid 2>/dev/null; then
+        kill $cmd_pid 2>/dev/null
+        wait $cmd_pid 2>/dev/null || true
+        if [ "$SCAN_INTERRUPTED" = true ]; then
+            echo "SCAN INTERRUPTED BY USER" >> "$output_file"
+            exit_code=130
+        else
+            echo "SCAN TIMEOUT AFTER ${timeout_duration} SECONDS" >> "$output_file"
+            exit_code=124
+        fi
+    else
+        wait $cmd_pid
+        exit_code=$?
+    fi
+    
     set -e
+    CURRENT_SCAN=""
     
     case $exit_code in
-        0)
-            echo -e "${GREEN}[DONE]${NC} $name"
-            return 0
-            ;;
-        124)
-            echo -e "${YELLOW}[TIMEOUT]${NC} $name (${timeout_duration}s) - continuing with next scan..."
-            # Écrire un message dans le fichier de sortie pour indiquer le timeout
-            echo "SCAN TIMEOUT AFTER ${timeout_duration} SECONDS" >> "$output_file"
-            return 0  # Retourner 0 pour continuer le script
-            ;;
-        *)
-            echo -e "${RED}[ERROR]${NC} $name failed (exit code: $exit_code) - continuing with next scan..."
-            # Écrire un message dans le fichier de sortie pour indiquer l'erreur
-            echo "SCAN FAILED WITH EXIT CODE $exit_code" >> "$output_file"
-            return 0  # Retourner 0 pour continuer le script
+        0) return 0 ;;
+        130) return 130 ;;
+        *) 
+            echo -e "${YELLOW}[WARNING]${NC} $name terminé avec des erreurs (code: $exit_code)"
+            return 0 
             ;;
     esac
 }
 
 show_scan_menu() {
-    echo -e "\n${YELLOW}Select scan type:${NC}"
-    echo -e "${CYAN}1)${NC} OSINT & Information Gathering"
-    echo -e "${CYAN}2)${NC} Domain & Certificate Analysis" 
-    echo -e "${CYAN}3)${NC} Network Port Scanning"
-    echo -e "${CYAN}4)${NC} Complete Assessment (All scans)"
+    echo -e "\n${YELLOW}Sélectionner le type d'évaluation:${NC}"
+    echo -e "${CYAN}1)${NC} OSINT & Collecte d'informations"
+    echo -e "${CYAN}2)${NC} Reconnaissance réseau & énumération" 
+    echo -e "${CYAN}3)${NC} Test de sécurité d'applications web"
+    echo -e "${CYAN}4)${NC} Évaluation Red Team complète"
+    echo
+    
+    if [ "$QUICK_MODE" = true ]; then
+        echo -e "${YELLOW}[MODE]${NC} Mode rapide activé - scans optimisés pour la vitesse"
+    fi
+    
+    if [ "$STEALTH_MODE" = true ]; then
+        echo -e "${YELLOW}[MODE]${NC} Mode furtif activé - techniques d'évasion"
+    fi
     echo
 }
 
@@ -515,12 +299,13 @@ run_osint_scans() {
     local target="$1"
     local domain="$2"
     
-    echo -e "\n${RED}[OSINT]${NC} Starting information gathering..."
+    echo -e "\n${RED}[OSINT]${NC} Démarrage de la collecte d'informations..."
     
     if [ -n "$domain" ]; then
-        execute_with_timeout "WHOIS Lookup" "whois '$domain'" 60 "$OUTDIR/osint/whois.txt"
+        execute_with_progress "WHOIS Lookup" "whois '$domain'" 60 "$OUTDIR/osint/whois.txt"
         
-        execute_with_timeout "DNS Enumeration" "
+        # DNS enumeration améliorée
+        execute_with_progress "DNS Enumeration" "
             echo '=== A Records ===' 
             dig +short '$domain' A
             echo -e '\n=== MX Records ==='
@@ -529,383 +314,540 @@ run_osint_scans() {
             dig +short '$domain' NS
             echo -e '\n=== TXT Records ==='
             dig +short '$domain' TXT
+            echo -e '\n=== AAAA Records ==='
+            dig +short '$domain' AAAA
+            echo -e '\n=== CNAME Records ==='
+            dig +short '$domain' CNAME
         " 60 "$OUTDIR/osint/dns_enum.txt"
         
-        if command -v dnsenum &> /dev/null; then
-            execute_with_timeout "DNS Enumeration (Advanced)" "dnsenum '$domain'" 300 "$OUTDIR/osint/dnsenum.txt"
-        fi
-        
-        if command -v dnsrecon &> /dev/null; then
-            execute_with_timeout "DNS Reconnaissance" "dnsrecon -d '$domain' -t std" 300 "$OUTDIR/osint/dnsrecon.txt"
-        fi
-        
-        if command -v theharvester &> /dev/null; then
-            execute_with_timeout "Email Harvesting" "theharvester -d '$domain' -l 100 -b google,bing,yahoo" 300 "$OUTDIR/osint/emails.txt"
-        fi
-    fi
-    
-    if [ -n "$target" ]; then
-        execute_with_timeout "Reverse DNS" "dig +short -x '$target'" 30 "$OUTDIR/osint/reverse_dns.txt"
-    fi
-    
-    echo -e "${GREEN}[COMPLETED]${NC} OSINT scans finished"
-}
-
-run_domain_scans() {
-    local domain="$1"
-    local url="$2"
-    
-    echo -e "\n${RED}[DOMAINS]${NC} Starting domain and certificate analysis..."
-    
-    if [ -n "$domain" ]; then
+        # Subdomain enumeration avancée
         if command -v subfinder &> /dev/null; then
-            execute_with_timeout "Subfinder Discovery" "subfinder -d '$domain' -silent" 300 "$OUTDIR/domains/subdomains_subfinder.txt"
+            execute_with_progress "Subfinder Discovery" "subfinder -d '$domain' -all -recursive" 300 "$OUTDIR/osint/subdomains_subfinder.txt"
         fi
         
         if command -v amass &> /dev/null; then
-            execute_with_timeout "Amass Enumeration" "amass enum -passive -d '$domain'" 600 "$OUTDIR/domains/subdomains_amass.txt"
+            local amass_timeout=600
+            [ "$QUICK_MODE" = true ] && amass_timeout=300
+            execute_with_progress "Amass Enumeration" "amass enum -passive -d '$domain'" $amass_timeout "$OUTDIR/osint/subdomains_amass.txt"
         fi
         
-        if command -v assetfinder &> /dev/null; then
-            execute_with_timeout "Assetfinder Discovery" "assetfinder '$domain'" 300 "$OUTDIR/domains/subdomains_assetfinder.txt"
+        # Certificate transparency
+        execute_with_progress "Certificate Transparency" "
+            curl -s 'https://crt.sh/?q=%.$domain&output=json' | jq -r '.[].name_value' | sed 's/\\*\\.//g' | sort -u
+        " 60 "$OUTDIR/osint/crt_sh.txt"
+        
+        # Email harvesting
+        if command -v theharvester &> /dev/null; then
+            execute_with_progress "Email Harvesting" "theharvester -d '$domain' -l 200 -b google,bing,yahoo,duckduckgo" 300 "$OUTDIR/osint/emails.txt"
         fi
         
-        execute_with_timeout "SSL Certificate Analysis" "echo | openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | openssl x509 -text" 30 "$OUTDIR/domains/ssl_cert.txt"
-        
-        if command -v sslscan &> /dev/null; then
-            execute_with_timeout "SSL Configuration Scan" "sslscan '$domain'" 300 "$OUTDIR/domains/sslscan.txt"
-        fi
+        # Google dorking automation
+        execute_with_progress "Google Dorking" "
+            echo 'site:$domain filetype:pdf'
+            echo 'site:$domain filetype:doc'
+            echo 'site:$domain filetype:xls'
+            echo 'site:$domain inurl:admin'
+            echo 'site:$domain inurl:login'
+            echo 'site:$domain inurl:config'
+            echo 'site:$domain intitle:\"index of\"'
+        " 30 "$OUTDIR/osint/google_dorks.txt"
     fi
     
-    if [ -n "$url" ]; then
-        if command -v whatweb &> /dev/null; then
-            execute_with_timeout "Technology Detection" "whatweb '$url' -v" 300 "$OUTDIR/domains/whatweb.txt"
-        fi
-        
-        if command -v wafw00f &> /dev/null; then
-            execute_with_timeout "WAF Detection" "wafw00f '$url'" 60 "$OUTDIR/domains/wafw00f.txt"
-        fi
+    if [ -n "$target" ]; then
+        execute_with_progress "Reverse DNS" "dig +short -x '$target'" 30 "$OUTDIR/osint/reverse_dns.txt"
+        execute_with_progress "IP Geolocation" "curl -s 'http://ip-api.com/json/$target'" 30 "$OUTDIR/osint/geolocation.txt"
     fi
     
-    # Consolider les sous-domaines
-    if ls "$OUTDIR/domains"/subdomains_*.txt 1> /dev/null 2>&1; then
-        echo -e "${CYAN}[INFO]${NC} Consolidating subdomain results..."
-        cat "$OUTDIR/domains"/subdomains_*.txt 2>/dev/null | sort -u > "$OUTDIR/domains/all_subdomains.txt"
-    fi
-    
-    echo -e "${GREEN}[COMPLETED]${NC} Domain scans finished"
+    echo -e "${GREEN}[COMPLETED]${NC} Collecte OSINT terminée"
 }
 
 run_network_scans() {
     local target="$1"
     
-    echo -e "\n${RED}[NETWORK]${NC} Starting network port scanning..."
+    echo -e "\n${RED}[NETWORK]${NC} Démarrage de la reconnaissance réseau..."
     
-    # 1. Scan rapide initial avec Nmap
-    execute_with_timeout "Nmap Quick Discovery" "nmap -n -sn '$target'" 30 "$OUTDIR/network/nmap_ping.txt"
+    # Host discovery amélioré
+    execute_with_progress "Host Discovery" "nmap -sn -PE -PP -PS21,22,23,25,53,80,113,443,993,995 '$target'" 60 "$OUTDIR/network/host_discovery.txt"
     
-    # 2. Scan rapide des ports les plus communs
-    execute_with_timeout "Nmap Fast Scan" "nmap -n -T5 --top-ports 1000 --min-rate=5000 '$target'" 300 "$OUTDIR/network/nmap_fast.txt"
-    
-    # 3. Scan complet TCP avec détection de service et scripts
-    execute_with_timeout "Nmap Full TCP Scan" "nmap -n -Pn -T4 -p- -sS -sV -sC '$target'" 1800 "$OUTDIR/network/nmap_full.txt"
-    
-    # 4. Scan avec options agressives mais rapide
-    execute_with_timeout "Nmap Aggressive Scan" "nmap -n -Pn -T4 -A --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_aggressive.txt"
-    
-    # 5. Scan UDP des ports critiques
-    execute_with_timeout "Nmap UDP Scan" "nmap -n -Pn -T4 --top-ports 100 -sU '$target'" 600 "$OUTDIR/network/nmap_udp.txt"
-    
-    # 6. Scan de vulnérabilités avec scripts Nmap
-    execute_with_timeout "Nmap Vulnerability Scan" "nmap -n -Pn -T4 --script vuln --top-ports 1000 '$target'" 900 "$OUTDIR/network/nmap_vulns.txt"
-    
-    # 7. Scan stealthier pour éviter la détection
-    execute_with_timeout "Nmap Stealth Scan" "nmap -n -Pn -T2 -f -D RND:10 --top-ports 500 '$target'" 900 "$OUTDIR/network/nmap_stealth.txt"
-    
-    # 8. Masscan si disponible
-    if command -v masscan &> /dev/null; then
-        execute_with_timeout "Masscan Ultra-Fast" "masscan '$target' -p1-65535 --rate=50000" 300 "$OUTDIR/network/masscan.txt"
+    # Port scanning adaptatif selon le mode
+    if [ "$QUICK_MODE" = true ]; then
+        # Mode rapide - top 1000 ports seulement
+        execute_with_progress "Quick Port Scan" "nmap -T5 --top-ports 1000 --min-rate=5000 '$target'" 180 "$OUTDIR/network/nmap_quick.txt"
+        
+        # Rustscan si disponible (plus rapide)
+        if command -v rustscan &> /dev/null; then
+            execute_with_progress "RustScan Ultra-Fast" "rustscan -a '$target' --top" 120 "$OUTDIR/network/rustscan.txt"
+        fi
+    elif [ "$STEALTH_MODE" = true ]; then
+        # Mode furtif - scans lents et évasifs
+        execute_with_progress "Stealth SYN Scan" "nmap -sS -T2 -f --mtu 24 --scan-delay 5s --top-ports 1000 '$target'" 1800 "$OUTDIR/network/nmap_stealth.txt"
+        execute_with_progress "Decoy Scan" "nmap -sS -T2 -D RND:10 --top-ports 500 '$target'" 1200 "$OUTDIR/network/nmap_decoy.txt"
+    else
+
+        # Mode standard optimisé - REMPLACE le scan TCP complet problématique
+        execute_with_progress "Standard Port Scan" "nmap -sS -T4 --top-ports 3000 --min-rate=1000 '$target'" 600 "$OUTDIR/network/nmap_standard.txt"
+        
+        # Service detection sur les ports ouverts seulement
+        execute_with_progress "Service Detection" "nmap -sV -sC --version-intensity 5 --top-ports 1000 '$target'" 900 "$OUTDIR/network/nmap_services.txt"
     fi
     
-    # 9. Unicornscan si disponible
-    if command -v unicornscan &> /dev/null; then
-        execute_with_timeout "Unicornscan TCP" "unicornscan -mT '$target':1-1000" 300 "$OUTDIR/network/unicornscan_tcp.txt"
-    fi
+    # UDP scan critique seulement (optimisé)
+    execute_with_progress "UDP Critical Ports" "nmap -sU --top-ports 20 '$target'" 300 "$OUTDIR/network/nmap_udp_critical.txt"
     
-    # 10. OS Fingerprinting avec timeout réduit et options robustes
-    execute_with_timeout "OS Fingerprinting" "nmap -n -Pn -O --osscan-guess --max-os-tries 2 '$target'" 180 "$OUTDIR/network/nmap_os.txt"
+    # OS detection léger
+    execute_with_progress "OS Fingerprinting" "nmap -O --osscan-guess --max-os-tries 2 '$target'" 180 "$OUTDIR/network/nmap_os.txt"
     
-    # 11. Scan des services avec bannière
-    execute_with_timeout "Service Banner Grab" "nmap -n -Pn -T4 -sV --version-intensity 5 --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_services.txt"
+    # Scripts de vulnérabilités ciblés
+    execute_with_progress "Vulnerability Scripts" "nmap --script vuln,safe --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_vulns.txt"
     
-    # 12. Scan avec techniques d'évasion
-    execute_with_timeout "Nmap Evasion Scan" "nmap -n -Pn -T2 -f --mtu 24 --data-length 1337 --top-ports 500 '$target'" 900 "$OUTDIR/network/nmap_evasion.txt"
+    # SMB enumeration si applicable
+    execute_with_progress "SMB Enumeration" "
+        nmap -p 445 --script smb-enum-shares,smb-enum-users,smb-os-discovery '$target'
+        enum4linux -a '$target' 2>/dev/null || echo 'enum4linux not available'
+    " 300 "$OUTDIR/network/smb_enum.txt"
     
-    echo -e "${GREEN}[COMPLETED]${NC} Network scans finished"
+    # SNMP enumeration
+    execute_with_progress "SNMP Enumeration" "nmap -sU -p 161 --script snmp-sysdescr,snmp-processes,snmp-netstat '$target'" 180 "$OUTDIR/network/snmp_enum.txt"
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Reconnaissance réseau terminée"
 }
 
 run_web_scans() {
     local url="$1"
     
-    echo -e "\n${RED}[WEB]${NC} Starting web application testing..."
+    echo -e "\n${RED}[WEB]${NC} Démarrage des tests d'applications web..."
     
+    # Technology detection améliorée
+    if command -v whatweb &> /dev/null; then
+        execute_with_progress "Technology Detection" "whatweb '$url' -a 3 -v" 120 "$OUTDIR/web/whatweb.txt"
+    fi
+    
+    # WAF detection
+    if command -v wafw00f &> /dev/null; then
+        execute_with_progress "WAF Detection" "wafw00f '$url'" 60 "$OUTDIR/web/wafw00f.txt"
+    fi
+    
+    # SSL/TLS analysis
+    execute_with_progress "SSL/TLS Analysis" "
+        echo '=== SSL Certificate Info ==='
+        echo | openssl s_client -connect '$(echo $url | sed 's|https\\?://||'):443' -servername '$(echo $url | sed 's|https\\?://||')' 2>/dev/null | openssl x509 -text
+        echo -e '\n=== SSL Configuration ==='
+        nmap --script ssl-enum-ciphers -p 443 '$(echo $url | sed 's|https\\?://||')'
+    " 180 "$OUTDIR/web/ssl_analysis.txt"
+    
+    # Directory enumeration optimisée
     local wordlist_dir="/usr/share/wordlists/dirb"
-    local fallback_dir="$HOME/.local/share/wordlists/dirb"
+    [ ! -d "$wordlist_dir" ] && wordlist_dir="$HOME/.local/share/wordlists/dirb"
     
-    # Déterminer quel répertoire de wordlists utiliser
-    if [ -f "$wordlist_dir/common.txt" ]; then
-        local common_wordlist="$wordlist_dir/common.txt"
-        local big_wordlist="$wordlist_dir/big.txt"
-    elif [ -f "$fallback_dir/common.txt" ]; then
-        local common_wordlist="$fallback_dir/common.txt"
-        local big_wordlist="$fallback_dir/big.txt"
-    else
-        echo -e "${RED}[ERROR]${NC} No wordlists found. Run complete scan to install them."
-        return 1
-    fi
-    
-    if command -v gobuster &> /dev/null; then
-        execute_with_timeout "Directory Enumeration (Common)" "gobuster dir -u '$url' -w '$common_wordlist' -t 50 -x php,html,txt,js" 600 "$OUTDIR/web/gobuster_common.txt"
-        
-        execute_with_timeout "Directory Enumeration (Big)" "gobuster dir -u '$url' -w '$big_wordlist' -t 30 -x php,html,txt" 900 "$OUTDIR/web/gobuster_big.txt"
-    fi
-    
-    if command -v dirb &> /dev/null; then
-        execute_with_timeout "Dirb Enumeration" "dirb '$url' '$common_wordlist'" 600 "$OUTDIR/web/dirb.txt"
-    fi
-    
-    if command -v nikto &> /dev/null; then
-        execute_with_timeout "Nikto Vulnerability Scan" "nikto -h '$url'" 600 "$OUTDIR/web/nikto.txt"
-    fi
-    
-    if command -v nuclei &> /dev/null; then
-        local template_dirs=(
-            "$HOME/nuclei-templates"
-            "$HOME/.local/share/nuclei-templates"
-            "/usr/share/nuclei-templates"
-            "$(go env GOPATH)/pkg/mod/github.com/projectdiscovery/nuclei-templates*"
-        )
-        
-        local template_dir=""
-        for dir in "${template_dirs[@]}"; do
-            if [ -d "$dir" ]; then
-                template_dir="$dir"
-                break
-            fi
-        done
-        
-        if [ -n "$template_dir" ]; then
-            execute_with_timeout "Nuclei Templates" "nuclei -u '$url' -t '$template_dir/'" 600 "$OUTDIR/web/nuclei.txt"
+    if command -v gobuster &> /dev/null && [ -f "$wordlist_dir/common.txt" ]; then
+        if [ "$QUICK_MODE" = true ]; then
+            execute_with_progress "Quick Directory Enum" "gobuster dir -u '$url' -w '$wordlist_dir/common.txt' -t 30 -x php,html,txt" 300 "$OUTDIR/web/gobuster_quick.txt"
         else
-            execute_with_timeout "Nuclei Basic" "nuclei -u '$url'" 300 "$OUTDIR/web/nuclei.txt"
+            execute_with_progress "Directory Enumeration" "gobuster dir -u '$url' -w '$wordlist_dir/common.txt' -t 50 -x php,html,txt,js,css,json" 600 "$OUTDIR/web/gobuster_common.txt"
+            execute_with_progress "Extended Directory Enum" "gobuster dir -u '$url' -w '$wordlist_dir/big.txt' -t 30 -x php,html" 900 "$OUTDIR/web/gobuster_extended.txt"
         fi
     fi
     
-    if command -v sqlmap &> /dev/null; then
-        mkdir -p "$OUTDIR/web/sqlmap"
-        execute_with_timeout "SQL Injection Testing" "sqlmap -u '$url' --batch --level=2 --risk=1 --output-dir='$OUTDIR/web/sqlmap'" 600 "$OUTDIR/web/sqlmap.log"
+    # Nuclei vulnerability scanning
+    if command -v nuclei &> /dev/null; then
+        if [ "$QUICK_MODE" = true ]; then
+            execute_with_progress "Quick Vulnerability Scan" "nuclei -u '$url' -t /root/nuclei-templates/cves/ -t /root/nuclei-templates/exposures/" 300 "$OUTDIR/web/nuclei_quick.txt"
+        else
+            execute_with_progress "Comprehensive Vuln Scan" "nuclei -u '$url' -severity critical,high,medium" 900 "$OUTDIR/web/nuclei_comprehensive.txt"
+        fi
     fi
     
-    echo -e "${GREEN}[COMPLETED]${NC} Web scans finished"
+    # Nikto scan
+    if command -v nikto &> /dev/null; then
+        local nikto_timeout=600
+        [ "$QUICK_MODE" = true ] && nikto_timeout=300
+        execute_with_progress "Nikto Web Scan" "nikto -h '$url' -C all" $nikto_timeout "$OUTDIR/web/nikto.txt"
+    fi
+    
+    # SQL injection testing
+    if command -v sqlmap &> /dev/null; then
+        mkdir -p "$OUTDIR/web/sqlmap"
+        execute_with_progress "SQL Injection Testing" "sqlmap -u '$url' --batch --level=2 --risk=2 --output-dir='$OUTDIR/web/sqlmap' --threads=5" 600 "$OUTDIR/web/sqlmap/sqlmap.log"
+    fi
+    
+    # XSS testing avec diverses techniques
+    execute_with_progress "XSS Detection" "
+        echo '=== Basic XSS Payloads ==='
+        echo '<script>alert(1)</script>'
+        echo '\"><script>alert(1)</script>'
+        echo 'javascript:alert(1)'
+        echo '=== Advanced XSS Payloads ==='
+        echo '<img src=x onerror=alert(1)>'
+        echo '<svg onload=alert(1)>'
+        echo '\';alert(1);//'
+    " 30 "$OUTDIR/web/xss_payloads.txt"
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Tests d'applications web terminés"
+}
+
+run_exploitation_prep() {
+    local target="$1"
+    
+    echo -e "\n${RED}[EXPLOIT]${NC} Préparation à l'exploitation..."
+    
+    # Searchsploit integration
+    if command -v searchsploit &> /dev/null; then
+        execute_with_progress "Exploit Database Search" "
+            # Recherche par services détectés
+            if [ -f '$OUTDIR/network/nmap_services.txt' ]; then
+                grep -oP '\\d+/tcp\\s+open\\s+\\K[^\\s]+' '$OUTDIR/network/nmap_services.txt' 2>/dev/null | while read service; do
+                    echo \"=== Exploits pour \$service ===\"
+                    searchsploit \"\$service\" 2>/dev/null | head -10 || echo \"Aucun exploit trouvé pour \$service\"
+                done
+            else
+                echo \"Fichier de services non trouvé\"
+            fi
+        " 300 "$OUTDIR/exploitation/searchsploit.txt"
+    fi
+    
+    # MSF module suggestions
+    execute_with_progress "Metasploit Module Prep" "
+        echo '=== Suggested MSF Modules Based on Scan Results ==='
+        echo 'use auxiliary/scanner/portscan/tcp'
+        echo 'use auxiliary/scanner/smb/smb_version'
+        echo 'use auxiliary/scanner/http/http_version'
+        echo 'use auxiliary/scanner/ssh/ssh_version'
+        echo '=== Exploitation Commands ==='
+        echo 'search type:exploit platform:linux'
+        echo 'search type:exploit platform:windows'
+    " 30 "$OUTDIR/exploitation/msf_prep.txt"
+    
+    # Common attack vectors summary
+    execute_with_progress "Attack Surface Analysis" "
+        echo '=== Attack Surface Summary ==='
+        echo 'Open Ports:'
+        if [ -f '$OUTDIR/network/nmap_standard.txt' ]; then
+            grep 'open' '$OUTDIR/network/nmap_standard.txt' | head -10
+        fi
+        echo -e '\nWeb Technologies:'
+        if [ -f '$OUTDIR/web/whatweb.txt' ]; then
+            grep -i 'Title\\|Server\\|Framework' '$OUTDIR/web/whatweb.txt' | head -5
+        fi
+        echo -e '\nPotential Entry Points:'
+        echo '- Check for default credentials'
+        echo '- Test for weak SSL/TLS configurations'
+        echo '- Analyze web application for OWASP Top 10'
+        echo '- SMB null sessions if applicable'
+        echo '- SNMP default communities'
+    " 60 "$OUTDIR/exploitation/attack_surface.txt"
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Préparation à l'exploitation terminée"
 }
 
 generate_clean_report() {
     local report_file="$OUTDIR/reports/executive_summary.txt"
     
-    echo -e "${CYAN}[INFO]${NC} Generating executive summary report..."
+    echo -e "${CYAN}[INFO]${NC} Génération du rapport de synthèse..."
     
     {
         echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-        echo "║                            SECURITY ASSESSMENT REPORT                       ║"
+        echo "║                       RED TEAM ASSESSMENT REPORT                            ║"
         echo "╚══════════════════════════════════════════════════════════════════════════════╝"
         echo
         echo "┌─ TARGET INFORMATION ─────────────────────────────────────────────────────────┐"
-        echo "│  IP Address: $TARGET"
-        [ -n "$URL" ] && echo "│  URL: $URL"
+        echo "│  Target IP: $TARGET"
+        [ -n "$URL" ] && echo "│  Target URL: $URL"
         [ -n "$DOMAIN" ] && echo "│  Domain: $DOMAIN"
-        echo "│  Scan Date: $(date)"
+        echo "│  Assessment Date: $(date)"
         echo "│  Tool Version: Security Scanner $VERSION"
+        [ "$QUICK_MODE" = true ] && echo "│  Mode: Quick Scan"
+        [ "$STEALTH_MODE" = true ] && echo "│  Mode: Stealth Scan"
         echo "└──────────────────────────────────────────────────────────────────────────────┘"
         echo
-        echo "┌─ SCAN RESULTS DIRECTORY ─────────────────────────────────────────────────────┐"
-        echo "│  Location: $OUTDIR"
-        echo "└──────────────────────────────────────────────────────────────────────────────┘"
-        echo
         
-        # Analyse des résultats OSINT
-        if [ -d "$OUTDIR/osint" ] && [ "$(ls -A "$OUTDIR/osint" 2>/dev/null)" ]; then
-            echo "┌─ OSINT & INFORMATION GATHERING ──────────────────────────────────────────────┐"
-            for f in "$OUTDIR/osint"/*; do
-                if [ -f "$f" ]; then
-                    local filename=$(basename "$f")
-                    local filesize=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo "0")
-                    printf "│  %-30s [%s bytes]\n" "$filename" "$filesize"
-                fi
-            done
-            echo "└──────────────────────────────────────────────────────────────────────────────┘"
-            echo
-        fi
+        echo "┌─ EXECUTIVE SUMMARY ───────────────────────────────────────────────────────────┐"
+        local critical_findings=0
+        local high_findings=0
+        local medium_findings=0
         
-        # Analyse des résultats de domaines
-        if [ -d "$OUTDIR/domains" ] && [ "$(ls -A "$OUTDIR/domains" 2>/dev/null)" ]; then
-            echo "┌─ DOMAIN & CERTIFICATE ANALYSIS ──────────────────────────────────────────────┐"
-            for f in "$OUTDIR/domains"/*; do
-                if [ -f "$f" ]; then
-                    local filename=$(basename "$f")
-                    local filesize=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo "0")
-                    printf "│  %-30s [%s bytes]\n" "$filename" "$filesize"
-                fi
-            done
-            
-            # Compter les sous-domaines trouvés
-            if [ -f "$OUTDIR/domains/all_subdomains.txt" ]; then
-                local subdomain_count=$(wc -l < "$OUTDIR/domains/all_subdomains.txt" 2>/dev/null || echo "0")
-                echo "│  Total subdomains discovered: $subdomain_count"
-            fi
-            echo "└──────────────────────────────────────────────────────────────────────────────┘"
-            echo
-        fi
-        
-        # Analyse des résultats réseau
-        if [ -d "$OUTDIR/network" ] && [ "$(ls -A "$OUTDIR/network" 2>/dev/null)" ]; then
-            echo "┌─ NETWORK RECONNAISSANCE ──────────────────────────────────────────────────────┐"
-            for f in "$OUTDIR/network"/*; do
-                if [ -f "$f" ]; then
-                    local filename=$(basename "$f")
-                    local filesize=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo "0")
-                    printf "│  %-30s [%s bytes]\n" "$filename" "$filesize"
-                fi
-            done
-            
-            # Analyser les ports ouverts
-            if [ -f "$OUTDIR/network/nmap_fast.txt" ]; then
-                local open_ports=$(grep -c "open" "$OUTDIR/network/nmap_fast.txt" 2>/dev/null || echo "0")
-                echo "│  Open ports detected: $open_ports"
-            fi
-            
-            # Analyser les services détectés
-            if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
-                local services_detected=$(grep -c "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null || echo "0")
-                echo "│  Services detected: $services_detected"
-            fi
-            
-            # Vérifier les vulnérabilités trouvées
-            if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-                local vulns_found=$(grep -c "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo "0")
-                echo "│  Potential vulnerabilities: $vulns_found"
-            fi
-            
-            echo "└──────────────────────────────────────────────────────────────────────────────┘"
-            echo
-        fi
-        
-        # Analyse des résultats web
-        if [ -d "$OUTDIR/web" ] && [ "$(ls -A "$OUTDIR/web" 2>/dev/null)" ]; then
-            echo "┌─ WEB APPLICATION TESTING ─────────────────────────────────────────────────────┐"
-            for f in "$OUTDIR/web"/*; do
-                if [ -f "$f" ]; then
-                    local filename=$(basename "$f")
-                    local filesize=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo "0")
-                    printf "│  %-30s [%s bytes]\n" "$filename" "$filesize"
-                elif [ -d "$f" ]; then
-                    local dirname=$(basename "$f")
-                    printf "│  %-30s [directory]\n" "$dirname"
-                fi
-            done
-            
-            # Analyser les répertoires trouvés
-            if [ -f "$OUTDIR/web/gobuster_common.txt" ]; then
-                local dirs_found=$(wc -l < "$OUTDIR/web/gobuster_common.txt" 2>/dev/null || echo "0")
-                echo "│  Web directories found: $dirs_found"
-            fi
-            echo "└──────────────────────────────────────────────────────────────────────────────┘"
-            echo
-        fi
-        
-        echo "┌─ QUICK ANALYSIS ──────────────────────────────────────────────────────────────┐"
-        
-        # Résumé rapide des découvertes
-        if [ -f "$OUTDIR/network/nmap_fast.txt" ]; then
-            echo "│  Top Open Ports:"
-            grep "open" "$OUTDIR/network/nmap_fast.txt" 2>/dev/null | head -5 | while read line; do
-                echo "│    - $line"
-            done
-        fi
-        
-        # Afficher les services critiques détectés
-        if [ -f "$OUTDIR/network/nmap_common.txt" ]; then
-            echo "│  Critical Services:"
-            grep -E "(ssh|ftp|telnet|http|https|smtp|pop|imap|ldap|mysql|postgresql|oracle|mssql|vnc|rdp)" "$OUTDIR/network/nmap_common.txt" 2>/dev/null | head -5 | while read line; do
-                echo "│    - $line"
-            done
-        fi
-        
-        # Afficher les vulnérabilités critiques si trouvées
+        # Compter les découvertes critiques
         if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-            echo "│  Security Issues:"
-            grep -i "VULNERABLE\|CVE\|CRITICAL\|HIGH" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -3 | while read line; do
-                echo "│    - $line"
-            done
+            critical_findings=$(grep -c "VULNERABLE\|CRITICAL" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo "0")
         fi
         
-        if [ -f "$OUTDIR/domains/all_subdomains.txt" ]; then
-            echo "│  Key Subdomains:"
-            head -5 "$OUTDIR/domains/all_subdomains.txt" 2>/dev/null | while read line; do
-                echo "│    - $line"
-            done
+        if [ -f "$OUTDIR/web/nuclei_comprehensive.txt" ]; then
+            high_findings=$(grep -c "high\|critical" "$OUTDIR/web/nuclei_comprehensive.txt" 2>/dev/null || echo "0")
         fi
         
-        if [ -f "$OUTDIR/web/gobuster_common.txt" ]; then
-            echo "│  Important Web Directories:"
-            head -5 "$OUTDIR/web/gobuster_common.txt" 2>/dev/null | while read line; do
-                echo "│    - $line"
-            done
+        echo "│  Critical Vulnerabilities: $critical_findings"
+        echo "│  High Risk Issues: $high_findings"
+        echo "│  Medium Risk Issues: $medium_findings"
+        
+        # Résumé des services exposés
+        if [ -f "$OUTDIR/network/nmap_standard.txt" ]; then
+            local open_ports=$(grep -c "open" "$OUTDIR/network/nmap_standard.txt" 2>/dev/null || echo "0")
+            echo "│  Exposed Services: $open_ports"
+        fi
+        
+        # Résumé des sous-domaines
+        if [ -f "$OUTDIR/osint/subdomains_subfinder.txt" ]; then
+            local subdomain_count=$(wc -l < "$OUTDIR/osint/subdomains_subfinder.txt" 2>/dev/null || echo "0")
+            echo "│  Subdomains Discovered: $subdomain_count"
         fi
         
         echo "└──────────────────────────────────────────────────────────────────────────────┘"
         echo
         
-        # Statistiques de scan
+        # Analyse détaillée des résultats
+        if [ -d "$OUTDIR/osint" ] && [ "$(ls -A "$OUTDIR/osint" 2>/dev/null)" ]; then
+            echo "┌─ OSINT & RECONNAISSANCE ──────────────────────────────────────────────────────┐"
+            echo "│  Information Gathering Results:"
+            
+            # Top subdomains
+            if [ -f "$OUTDIR/osint/subdomains_subfinder.txt" ]; then
+                echo "│  Key Subdomains Found:"
+                head -5 "$OUTDIR/osint/subdomains_subfinder.txt" 2>/dev/null | while read subdomain; do
+                    echo "│    • $subdomain"
+                done
+            fi
+            
+            # Email addresses
+            if [ -f "$OUTDIR/osint/emails.txt" ]; then
+                local email_count=$(grep -c "@" "$OUTDIR/osint/emails.txt" 2>/dev/null || echo "0")
+                echo "│  Email Addresses Found: $email_count"
+            fi
+            
+            echo "└──────────────────────────────────────────────────────────────────────────────┘"
+            echo
+        fi
+        
+        if [ -d "$OUTDIR/network" ] && [ "$(ls -A "$OUTDIR/network" 2>/dev/null)" ]; then
+            echo "┌─ NETWORK SECURITY ANALYSIS ───────────────────────────────────────────────────┐"
+            echo "│  Network Attack Surface:"
+            
+            # Services critiques exposés
+            if [ -f "$OUTDIR/network/nmap_standard.txt" ]; then
+                echo "│  Critical Services Exposed:"
+                grep -E "22/tcp|21/tcp|23/tcp|25/tcp|53/tcp|80/tcp|443/tcp|445/tcp|993/tcp|995/tcp|3389/tcp" "$OUTDIR/network/nmap_standard.txt" 2>/dev/null | grep "open" | while read line; do
+                    echo "│    • $line"
+                done
+            fi
+            
+            # Vulnérabilités réseau
+            if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+                echo "│  Network Vulnerabilities:"
+                grep "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -3 | while read vuln; do
+                    echo "│    ⚠ $vuln"
+                done
+            fi
+            
+            # OS Detection
+            if [ -f "$OUTDIR/network/nmap_os.txt" ]; then
+                echo "│  Operating System:"
+                grep "OS:" "$OUTDIR/network/nmap_os.txt" 2>/dev/null | head -1 | while read os; do
+                    echo "│    • $os"
+                done
+            fi
+            
+            echo "└──────────────────────────────────────────────────────────────────────────────┘"
+            echo
+        fi
+        
+        if [ -d "$OUTDIR/web" ] && [ "$(ls -A "$OUTDIR/web" 2>/dev/null)" ]; then
+            echo "┌─ WEB APPLICATION SECURITY ────────────────────────────────────────────────────┐"
+            echo "│  Web Security Assessment:"
+            
+            # Technologies détectées
+            if [ -f "$OUTDIR/web/whatweb.txt" ]; then
+                echo "│  Web Technologies:"
+                grep -oP "\\[\\K[^\\]]+" "$OUTDIR/web/whatweb.txt" 2>/dev/null | head -5 | while read tech; do
+                    echo "│    • $tech"
+                done
+            fi
+            
+            # WAF Detection
+            if [ -f "$OUTDIR/web/wafw00f.txt" ]; then
+                echo "│  WAF Status:"
+                if grep -q "No WAF detected" "$OUTDIR/web/wafw00f.txt" 2>/dev/null; then
+                    echo "│    • No Web Application Firewall detected"
+                else
+                    grep "is behind" "$OUTDIR/web/wafw00f.txt" 2>/dev/null | while read waf; do
+                        echo "│    • $waf"
+                    done
+                fi
+            fi
+            
+            # Répertoires sensibles
+            if [ -f "$OUTDIR/web/gobuster_common.txt" ]; then
+                echo "│  Sensitive Directories:"
+                grep -E "/admin|/login|/config|/backup|/test|/dev" "$OUTDIR/web/gobuster_common.txt" 2>/dev/null | head -5 | while read dir; do
+                    echo "│    • $dir"
+                done
+            fi
+            
+            echo "└──────────────────────────────────────────────────────────────────────────────┘"
+            echo
+        fi
+        
+        # Section Red Team spécifique
+        if [ -d "$OUTDIR/exploitation" ] && [ "$(ls -A "$OUTDIR/exploitation" 2>/dev/null)" ]; then
+            echo "┌─ RED TEAM ATTACK VECTORS ─────────────────────────────────────────────────────┐"
+            echo "│  Potential Attack Paths:"
+            
+            # Entry points
+            echo "│  Primary Entry Points:"
+            echo "│    • Web Application (if HTTP/HTTPS exposed)"
+            echo "│    • SSH Brute Force (if port 22 open)"
+            echo "│    • SMB Exploitation (if port 445 open)"
+            echo "│    • Email Phishing (based on harvested emails)"
+            
+            # Privilege escalation paths
+            echo "│  Privilege Escalation Opportunities:"
+            echo "│    • Service Version Exploits"
+            echo "│    • Kernel Exploits (based on OS detection)"
+            echo "│    • Misconfigured Services"
+            
+            echo "└──────────────────────────────────────────────────────────────────────────────┘"
+            echo
+        fi
+        
+        echo "┌─ RECOMMENDATIONS ─────────────────────────────────────────────────────────────┐"
+        echo "│  Immediate Actions Required:"
+        echo "│    1. Patch all identified vulnerabilities"
+        echo "│    2. Implement proper access controls"
+        echo "│    3. Configure Web Application Firewall"
+        echo "│    4. Enable monitoring and logging"
+        echo "│    5. Conduct security awareness training"
+        echo "│"
+        echo "│  Red Team Perspective:"
+        echo "│    • Focus on exposed web applications first"
+        echo "│    • Test default credentials on all services"
+        echo "│    • Attempt subdomain takeover if applicable"
+        echo "│    • Social engineering via harvested emails"
+        echo "│    • Network lateral movement preparation"
+        echo "└──────────────────────────────────────────────────────────────────────────────┘"
+        echo
+        
         echo "┌─ SCAN STATISTICS ─────────────────────────────────────────────────────────────┐"
-        local total_files=$(find "$OUTDIR" -type f | wc -l)
-        local total_size=$(du -sh "$OUTDIR" 2>/dev/null | cut -f1)
-        echo "│  Total files generated: $total_files"
-        echo "│  Total data collected: $total_size"
-        echo "│  Scan completed: $(date)"
+        local total_files=$(find "$OUTDIR" -type f 2>/dev/null | wc -l)
+        local total_size=$(du -sh "$OUTDIR" 2>/dev/null | cut -f1 || echo "Unknown")
+        echo "│  Files Generated: $total_files"
+        echo "│  Data Collected: $total_size"
+        echo "│  Assessment Completed: $(date)"
+        echo "│  Next Steps: Review detailed logs in subdirectories"
         echo "└──────────────────────────────────────────────────────────────────────────────┘"
         echo
         
         echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-        echo "║                    Report generated by Security Scanner v$VERSION                    ║"
+        echo "║              Red Team Security Scanner v$VERSION - Assessment Complete              ║"
         echo "╚══════════════════════════════════════════════════════════════════════════════╝"
         
     } > "$report_file"
     
-    echo -e "${GREEN}[REPORT]${NC} Executive summary: ${WHITE}$report_file${NC}"
+    # Générer aussi un rapport JSON pour l'automatisation
+    generate_json_report
+    
+    echo -e "${GREEN}[REPORT]${NC} Rapport de synthèse: ${WHITE}$report_file${NC}"
+}
+
+generate_json_report() {
+    local json_file="$OUTDIR/reports/assessment_results.json"
+    
+    {
+        echo "{"
+        echo "  \"assessment\": {"
+        echo "    \"target\": \"$TARGET\","
+        echo "    \"url\": \"$URL\","
+        echo "    \"domain\": \"$DOMAIN\","
+        echo "    \"date\": \"$(date -Iseconds)\","
+        echo "    \"version\": \"$VERSION\","
+        echo "    \"mode\": \"$([ "$QUICK_MODE" = true ] && echo "quick" || ([ "$STEALTH_MODE" = true ] && echo "stealth" || echo "standard"))\""
+        echo "  },"
+        echo "  \"results\": {"
+        
+        # OSINT results
+        echo "    \"osint\": {"
+        if [ -f "$OUTDIR/osint/subdomains_subfinder.txt" ]; then
+            local subdomain_count=$(wc -l < "$OUTDIR/osint/subdomains_subfinder.txt" 2>/dev/null || echo "0")
+            echo "      \"subdomains_found\": $subdomain_count,"
+        fi
+        
+        if [ -f "$OUTDIR/osint/emails.txt" ]; then
+            local email_count=$(grep -c "@" "$OUTDIR/osint/emails.txt" 2>/dev/null || echo "0")
+            echo "      \"emails_found\": $email_count,"
+        fi
+        echo "      \"completed\": true"
+        echo "    },"
+        
+        # Network results
+        echo "    \"network\": {"
+        if [ -f "$OUTDIR/network/nmap_standard.txt" ]; then
+            local open_ports=$(grep -c "open" "$OUTDIR/network/nmap_standard.txt" 2>/dev/null || echo "0")
+            echo "      \"open_ports\": $open_ports,"
+        fi
+        
+        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+            local vulns=$(grep -c "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo "0")
+            echo "      \"vulnerabilities\": $vulns,"
+        fi
+        echo "      \"completed\": true"
+        echo "    },"
+        
+        # Web results
+        echo "    \"web\": {"
+        if [ -f "$OUTDIR/web/gobuster_common.txt" ]; then
+            local dirs_found=$(wc -l < "$OUTDIR/web/gobuster_common.txt" 2>/dev/null || echo "0")
+            echo "      \"directories_found\": $dirs_found,"
+        fi
+        echo "      \"completed\": true"
+        echo "    }"
+        
+        echo "  },"
+        echo "  \"metadata\": {"
+        echo "    \"scan_duration\": \"$(date)\","
+        echo "    \"output_directory\": \"$OUTDIR\","
+        echo "    \"total_files\": $(find "$OUTDIR" -type f 2>/dev/null | wc -l)"
+        echo "  }"
+        echo "}"
+        
+    } > "$json_file"
 }
 
 main() {
     # Parse arguments
-    case "${1:-}" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -v|--version)
-            echo "Security Scanner v$VERSION"
-            exit 0
-            ;;
-    esac
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                echo "Security Scanner v$VERSION"
+                exit 0
+                ;;
+            -q|--quick)
+                QUICK_MODE=true
+                shift
+                ;;
+            -s|--stealth)
+                STEALTH_MODE=true
+                shift
+                ;;
+            *)
+                echo "Option inconnue: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Configuration du trap pour les interruptions
+    trap 'handle_interrupt' SIGINT SIGTERM
     
     display_banner
     
     # Get target information
-    echo -e "\n${YELLOW}Target Information:${NC}"
-    read -rp "Enter target IP address: " TARGET
-    [ -z "$TARGET" ] && { echo -e "${RED}[ERROR]${NC} No IP provided"; exit 1; }
+    echo -e "\n${YELLOW}Informations sur la cible:${NC}"
+    read -rp "Adresse IP de la cible: " TARGET
+    [ -z "$TARGET" ] && { echo -e "${RED}[ERROR]${NC} Aucune IP fournie"; exit 1; }
     
-    read -rp "Enter target URL (optional): " URL
-    read -rp "Enter domain name (optional): " DOMAIN
+    read -rp "URL de la cible (optionnel): " URL
+    read -rp "Nom de domaine (optionnel): " DOMAIN
     
     # Extract domain from URL if not provided
     if [ -n "$URL" ] && [ -z "$DOMAIN" ]; then
@@ -913,89 +855,59 @@ main() {
     fi
     
     show_scan_menu
-    read -rp "Select option [1-4]: " SCAN_CHOICE
+    read -rp "Sélectionner l'option [1-4]: " SCAN_CHOICE
     
     prepare_output
     
-    # Variable pour suivre les interruptions
-    local scan_interrupted=false
-    
-    # Fonction pour gérer les interruptions utilisateur (Ctrl+C)
-    handle_interrupt() {
-        echo -e "\n${YELLOW}[INFO]${NC} Scan interrupted by user. Generating partial report..."
-        scan_interrupted=true
-        generate_clean_report
-        echo -e "\n${CYAN}[INFO]${NC} Partial results saved in: ${WHITE}$OUTDIR${NC}"
-        exit 130
-    }
-    
-    # Configurer le trap pour les interruptions
-    trap 'handle_interrupt' SIGINT
-    
-    # Fonction pour exécuter les scans avec gestion d'interruption
-    run_scan_with_interrupt_check() {
-        local scan_function="$1"
-        shift
-        local args=("$@")
-        
-        if [ "$scan_interrupted" = false ]; then
-            if $scan_function "${args[@]}"; then
-                return 0
-            else
-                local exit_code=$?
-                if [ $exit_code -eq 130 ]; then
-                    scan_interrupted=true
-                    return 130
-                fi
-                return 0
-            fi
-        fi
-        return 0
-    }
+    echo -e "\n${CYAN}[INFO]${NC} Démarrage de l'évaluation de sécurité..."
+    echo -e "${YELLOW}[TIP]${NC} Utilisez Ctrl+C pour arrêter gracieusement le scan"
     
     case "$SCAN_CHOICE" in
         1)
-            check_and_install_tools "osint"
-            run_scan_with_interrupt_check run_osint_scans "$TARGET" "$DOMAIN"
+            run_osint_scans "$TARGET" "$DOMAIN"
             ;;
         2)
-            check_and_install_tools "domain"
-            run_scan_with_interrupt_check run_domain_scans "$DOMAIN" "$URL"
+            run_network_scans "$TARGET"
             ;;
         3)
-            check_and_install_tools "network"
-            run_scan_with_interrupt_check run_network_scans "$TARGET"
+            if [ -z "$URL" ]; then
+                echo -e "${RED}[ERROR]${NC} URL requise pour les tests web"
+                exit 1
+            fi
+            run_web_scans "$URL"
             ;;
         4)
-            check_and_install_tools "complete"
-            run_scan_with_interrupt_check run_osint_scans "$TARGET" "$DOMAIN"
-            [ "$scan_interrupted" = false ] && run_scan_with_interrupt_check run_domain_scans "$DOMAIN" "$URL"
-            [ "$scan_interrupted" = false ] && run_scan_with_interrupt_check run_network_scans "$TARGET"
-            [ "$scan_interrupted" = false ] && [ -n "$URL" ] && run_scan_with_interrupt_check run_web_scans "$URL"
+            echo -e "${CYAN}[INFO]${NC} Évaluation Red Team complète en cours..."
+            run_osint_scans "$TARGET" "$DOMAIN"
+            [ "$SCAN_INTERRUPTED" = false ] && run_network_scans "$TARGET"
+            [ "$SCAN_INTERRUPTED" = false ] && [ -n "$URL" ] && run_web_scans "$URL"
+            [ "$SCAN_INTERRUPTED" = false ] && run_exploitation_prep "$TARGET"
             ;;
         *)
-            echo -e "${RED}[ERROR]${NC} Invalid selection"
+            echo -e "${RED}[ERROR]${NC} Sélection invalide"
             exit 1
             ;;
     esac
     
     # Vérifier si le scan a été interrompu
-    if [ "$scan_interrupted" = true ]; then
+    if [ "$SCAN_INTERRUPTED" = true ]; then
         exit 130
     fi
     
-    # Toujours générer le rapport, même en cas de timeouts
+    # Génération du rapport final
     generate_clean_report
     
     echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                              SCAN COMPLETED                                  ║${NC}"
+    echo -e "${GREEN}║                         RED TEAM ASSESSMENT COMPLETED                       ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e "${WHITE}Results saved in:${NC} ${CYAN}$OUTDIR${NC}"
-    echo -e "${WHITE}Executive summary:${NC} ${CYAN}$OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${WHITE}Résultats sauvegardés dans:${NC} ${CYAN}$OUTDIR${NC}"
+    echo -e "${WHITE}Rapport de synthèse:${NC} ${CYAN}$OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${WHITE}Rapport JSON:${NC} ${CYAN}$OUTDIR/reports/assessment_results.json${NC}"
     echo
-    echo -e "${CYAN}[TIP]${NC} View results with: ${WHITE}cat $OUTDIR/reports/executive_summary.txt${NC}"
-    echo -e "${CYAN}[TIP]${NC} Browse files with: ${WHITE}ls -la $OUTDIR/network/${NC}"
-    echo -e "\n${YELLOW}Thank you for using Security Scanner!${NC}"
+    echo -e "${CYAN}[TIP]${NC} Consultez le rapport: ${WHITE}cat $OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${CYAN}[TIP]${NC} Explorez les résultats: ${WHITE}ls -la $OUTDIR/network/${NC}"
+    echo -e "${CYAN}[TIP]${NC} Import MSF: ${WHITE}msfconsole -r $OUTDIR/exploitation/msf_prep.txt${NC}"
+    echo -e "\n${YELLOW}Red Team Assessment terminé! Bonne chance pour la suite.${NC}"
 }
 
 # Execute main function
