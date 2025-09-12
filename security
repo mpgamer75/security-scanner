@@ -994,7 +994,42 @@ generate_json_report() {
         echo "    \"scan_duration\": \"$(date)\","
         echo "    \"output_directory\": \"$OUTDIR\","
         echo "    \"total_files\": $(find "$OUTDIR" -type f 2>/dev/null | wc -l),"
-        echo "    \"risk_level\": \"MEDIUM\""
+        echo "    \"tools_used\": [\"nmap\", \"subfinder\", \"amass\", \"nuclei\", \"nikto\", \"gobuster\", \"sqlmap\"],"
+        echo "    \"scan_completed\": true"
+        echo "  },"
+        echo "  \"raw_data\": {"
+        echo "    \"open_ports\": ["
+        
+        # Extraire tous les ports ouverts de tous les scans
+        local first_port=true
+        for scan_file in "$OUTDIR/network"/*.txt; do
+            if [ -f "$scan_file" ]; then
+                grep "open" "$scan_file" 2>/dev/null | grep -oP "\\d+/tcp" | while read port; do
+                    [ "$first_port" = false ] && echo ","
+                    echo -n "      \"$port\""
+                    first_port=false
+                done
+            fi
+        done
+        
+        echo
+        echo "    ],"
+        echo "    \"subdomains\": ["
+        
+        # Extraire les sous-domaines
+        if [ -f "$OUTDIR/osint/subdomains_subfinder.txt" ]; then
+            local first_sub=true
+            while read subdomain; do
+                [ -n "$subdomain" ] && {
+                    [ "$first_sub" = false ] && echo ","
+                    echo -n "      \"$subdomain\""
+                    first_sub=false
+                }
+            done < "$OUTDIR/osint/subdomains_subfinder.txt"
+        fi
+        
+        echo
+        echo "    ]"
         echo "  }"
         echo "}"
         
