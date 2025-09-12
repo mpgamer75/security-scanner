@@ -667,8 +667,17 @@ generate_clean_report() {
             echo "│  Subdomains Discovered: $subdomain_count"
         fi
         
-        # Calcul du score de risque
-        local risk_score=$((critical_findings * 10 + high_findings * 5 + medium_findings * 2))
+        # Calcul du score de risque - CORRECTION COMPLÈTE
+        local risk_score=0
+        if [ "$critical_findings" -gt 0 ] 2>/dev/null; then
+            risk_score=$((risk_score + critical_findings * 10))
+        fi
+        if [ "$high_findings" -gt 0 ] 2>/dev/null; then
+            risk_score=$((risk_score + high_findings * 5))
+        fi
+        if [ "$medium_findings" -gt 0 ] 2>/dev/null; then
+            risk_score=$((risk_score + medium_findings * 2))
+        fi
         echo "│  Risk Score: $risk_score/100"
         
         if [ $risk_score -ge 70 ]; then
