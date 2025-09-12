@@ -646,6 +646,11 @@ generate_clean_report() {
             medium_findings=$(grep -c "OSVDB\|CVE" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo "0")
         fi
         
+        # S'assurer que toutes les variables ont une valeur par défaut
+        critical_findings=${critical_findings:-0}
+        high_findings=${high_findings:-0}
+        medium_findings=${medium_findings:-0}
+        
         echo "│  Critical Vulnerabilities: $critical_findings"
         echo "│  High Risk Issues: $high_findings"
         echo "│  Medium Risk Issues: $medium_findings"
