@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Couleurs modernes et professionnelles
+# Couleurs 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -33,7 +33,7 @@ NC='\033[0m'
 
 VERSION="2.2.1"
 
-# Variables globales pour gestion interruption
+# Variables globales
 SCAN_INTERRUPTED=false
 CURRENT_SCAN=""
 
@@ -189,17 +189,17 @@ execute_with_progress() {
         local progress_pid=$!
     fi
     
-    # Exécution de la commande
+    
     set +e
     timeout "$timeout_duration" bash -c "$command" > "$output_file" 2>&1 &
     local cmd_pid=$!
     
-    # Attendre la fin ou interruption
+    
     while kill -0 $cmd_pid 2>/dev/null && [ "$SCAN_INTERRUPTED" = false ]; do
         sleep 1
     done
     
-    # Nettoyer le processus de progression
+    
     if [ "$show_progress" = true ]; then
         kill $progress_pid 2>/dev/null || true
         wait $progress_pid 2>/dev/null || true
@@ -1004,12 +1004,12 @@ generate_clean_report() {
         
         echo "┌─ EXECUTIVE SUMMARY ───────────────────────────────────────────────────────────┐"
         
-        # Compter les découvertes critiques de manière plus précise et complète
+        # Compte les découvertes critiques 
         local critical_findings=0
         local high_findings=0
         local medium_findings=0
         
-        # Compter les vulnérabilités critiques depuis tous les scans réseau
+        
         for scan_file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/network/nmap_critical_vulns.txt" "$OUTDIR/network/nmap_vulners.txt" "$OUTDIR/network/smb_enum.txt"; do
             if [ -f "$scan_file" ]; then
                 local count=$(grep -c "VULNERABLE\|CRITICAL\|EXPLOITABLE\|CVE.*CRITICAL\|ms17-010\|EternalBlue" "$scan_file" 2>/dev/null || echo "0")
@@ -1017,7 +1017,7 @@ generate_clean_report() {
             fi
         done
         
-        # Compter les vulnérabilités web de haute priorité
+        # Compte les vulnérabilités web de haute priorité
         for scan_file in "$OUTDIR/web/nuclei_comprehensive.txt" "$OUTDIR/web/nuclei_quick.txt" "$OUTDIR/web/nikto.txt"; do
             if [ -f "$scan_file" ]; then
                 local count=$(grep -c "critical\|high\|HIGH\|CRITICAL" "$scan_file" 2>/dev/null || echo "0")
@@ -1025,7 +1025,7 @@ generate_clean_report() {
             fi
         done
         
-        # Compter les vulnérabilités moyennes
+        
         for scan_file in "$OUTDIR/web/nikto.txt" "$OUTDIR/web/gobuster_common.txt" "$OUTDIR/network/nmap_vulns.txt"; do
             if [ -f "$scan_file" ]; then
                 local count=$(grep -c "OSVDB\|CVE\|medium\|MEDIUM\|WARNING" "$scan_file" 2>/dev/null || echo "0")
@@ -1033,7 +1033,7 @@ generate_clean_report() {
             fi
         done
         
-        # S'assurer que toutes les variables ont une valeur par défaut
+        # On vérifie que toutes les variables ont une valeur par défaut
         critical_findings=${critical_findings:-0}
         high_findings=${high_findings:-0}
         medium_findings=${medium_findings:-0}
@@ -1042,19 +1042,19 @@ generate_clean_report() {
         echo "│  High Risk Issues: $high_findings"
         echo "│  Medium Risk Issues: $medium_findings"
         
-        # Résumé des services exposés
+        # Résume les services exposés
         if [ -f "$OUTDIR/network/nmap_standard.txt" ]; then
             local open_ports=$(grep -c "open" "$OUTDIR/network/nmap_standard.txt" 2>/dev/null || echo "0")
             echo "│  Exposed Services: $open_ports"
         fi
         
-        # Résumé des sous-domaines
+        
         if [ -f "$OUTDIR/osint/subdomains_subfinder.txt" ]; then
             local subdomain_count=$(wc -l < "$OUTDIR/osint/subdomains_subfinder.txt" 2>/dev/null || echo "0")
             echo "│  Subdomains Discovered: $subdomain_count"
         fi
         
-        # Calcul du score de risque - CORRECTION COMPLÈTE
+        
         local risk_score=0
         if [ "$critical_findings" -gt 0 ] 2>/dev/null; then
             risk_score=$((risk_score + critical_findings * 10))
@@ -1198,7 +1198,7 @@ generate_clean_report() {
             echo "┌─ RED TEAM ATTACK VECTORS ─────────────────────────────────────────────────────┐"
             echo "│  Recommended Attack Path:"
             
-            # Déterminer le meilleur vecteur d'attaque
+            # Détermine le meilleur vecteur d'attaque
             local attack_vector="Unknown"
             if [ -f "$OUTDIR/network/nmap_standard.txt" ]; then
                 if grep -q "80/tcp.*open\|443/tcp.*open" "$OUTDIR/network/nmap_standard.txt"; then
@@ -1286,7 +1286,7 @@ generate_clean_report() {
         local total_size=$(du -sh "$OUTDIR" 2>/dev/null | cut -f1 || echo "Unknown")
         local scan_duration="Unknown"
         
-        # Calculer la durée approximative
+        # Calcule la durée approximative
         if [ -f "$OUTDIR/network/nmap_standard.txt" ]; then
             scan_duration=$(grep "Nmap done" "$OUTDIR/network/nmap_standard.txt" | grep -oP "scanned in \K[0-9.]+" || echo "Unknown")
             [ "$scan_duration" != "Unknown" ] && scan_duration="${scan_duration}s"
