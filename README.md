@@ -4,7 +4,7 @@
 
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.0.0-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.2.0-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux-blue?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
@@ -75,7 +75,7 @@ rm -f $(go env GOPATH)/bin/{subfinder,nuclei,amass,assetfinder}
 - `subfinder` - Découverte de sous-domaines
 - `gobuster` - Brute force de répertoires
 - `sqlmap` - Détection d'injections SQL
-- `theharvester` - Collecte d'emails et d'informations
+- `theHarvester` - Collecte d'emails et d'informations
 - `whois` - Informations de domaine
 - `nikto` - Scanner de vulnérabilités web
 - `whatweb` - Identification de technologies
@@ -94,13 +94,23 @@ go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
 
 ## Fonctionnalités Principales
 
+### Nouveautés Version 2.2.0
+- **Interface utilisateur modernisée** avec design professionnel
+- **Scripts d'attaque automatisés** basés sur les résultats de scan
+- **Techniques de post-exploitation** et persistence avancées
+- **Énumération OSINT étendue** avec nouveaux outils
+- **Scripts NSE optimisés** pour SMB et vulnérabilités
+- **Rapports JSON structurés** pour l'automatisation
+- **Compatibilité theHarvester** nouvelle version
+- **Intégration Shodan** optionnelle
+
 ### OSINT & Collecte d'Informations
 
 - **Recherche WHOIS** - Informations sur la propriété du domaine
 - **Énumération DNS** - Records A, MX, NS, TXT
 - **Analyse de certificats SSL** - Détails des certificats
 - **Découverte de sous-domaines** - Via Subfinder
-- **Collecte d'emails** - TheHarvester integration
+- **Collecte d'emails** - theHarvester integration
 
 ### Reconnaissance Réseau
 
