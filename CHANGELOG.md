@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [2.2.0] - 2024-12-26
+## [2.2.1] - 2025-09-26
 
 ### AMÉLIORATIONS MAJEURES
 

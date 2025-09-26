@@ -39,33 +39,27 @@ CURRENT_SCAN=""
 
 display_banner() {
     clear
-    echo -e "${BRIGHT_CYAN}"
+    echo -e "${RED}"
     cat << "EOF"
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  ███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗             ║
-║  ██╔════╝██╔════╝██╔════╝██║   ██║██╔══██╗██║╚══██╔══╝╚██╗ ██╔╝             ║
-║  ███████╗█████╗  ██║     ██║   ██║██████╔╝██║   ██║    ╚████╔╝              ║
-║  ╚════██║██╔══╝  ██║     ██║   ██║██╔══██╗██║   ██║     ╚██╔╝               ║
-║  ███████║███████╗╚██████╗╚██████╔╝██║  ██║██║   ██║      ██║                ║
-║  ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝                ║
-║                                                                              ║
-║  ███████╗ ██████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗               ║
-║  ██╔════╝██╔════╝██╔══██╗████╗  ██║████╗  ██║██╔════╝██╔══██╗              ║
-║  ███████╗██║     ███████║██╔██╗ ██║██╔██╗ ██║█████╗  ██████╔╝              ║
-║  ╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗              ║
-║  ███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║              ║
-║  ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗
+██╔════╝██╔════╝██╔════╝██║   ██║██╔══██╗██║╚══██╔══╝╚██╗ ██╔╝
+███████╗█████╗  ██║     ██║   ██║██████╔╝██║   ██║    ╚████╔╝ 
+╚════██║██╔══╝  ██║     ██║   ██║██╔══██╗██║   ██║     ╚██╔╝  
+███████║███████╗╚██████╗╚██████╔╝██║  ██║██║   ██║      ██║   
+╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝   
+                                                               
+███████╗ ██████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗ 
+██╔════╝██╔════╝██╔══██╗████╗  ██║████╗  ██║██╔════╝██╔══██╗
+███████╗██║     ███████║██╔██╗ ██║██╔██╗ ██║█████╗  ██████╔╝
+╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗
+███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║
+╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
 EOF
     echo -e "${NC}"
-    echo -e "${BOLD}${BG_BLUE}${WHITE}                                                                              ${NC}"
     echo -e "${BOLD}${BG_BLUE}${WHITE}                ADVANCED RED TEAM SECURITY ASSESSMENT TOOL                ${NC}"
-    echo -e "${BOLD}${BG_BLUE}${WHITE}                                                                              ${NC}"
-    echo -e "${NC}"
-    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}Version:${NC} ${BRIGHT_YELLOW}${VERSION}${NC} ${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}Author:${NC} ${BRIGHT_GREEN}mpgamer75${NC} ${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}Mode:${NC} ${BRIGHT_MAGENTA}Professional${NC} ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
-    echo -e "${DIM}${GRAY}                        Ethical Hacking & Penetration Testing${NC}"
+    echo
+    echo -e "${BRIGHT_CYAN}Version:${NC} ${BRIGHT_YELLOW}${VERSION}${NC} | ${BRIGHT_CYAN}Author:${NC} ${BRIGHT_GREEN}mpgamer75${NC}"
+    echo -e "${DIM}${GRAY}Ethical Hacking & Penetration Testing${NC}"
     echo
 }
 
@@ -236,45 +230,39 @@ execute_with_progress() {
 }
 
 show_scan_menu() {
-    echo -e "\n${BRIGHT_WHITE}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_WHITE}║${NC}                          ${BRIGHT_CYAN}ASSESSMENT TYPE SELECTION${NC}                          ${BRIGHT_WHITE}║${NC}"
-    echo -e "${BRIGHT_WHITE}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "\n${BRIGHT_CYAN}ASSESSMENT TYPE SELECTION${NC}"
     echo
-    echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}1)${NC} ${BRIGHT_GREEN}OSINT & Information Gathering${NC}                                    ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Passive reconnaissance and public data collection${NC}             ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Subdomain enumeration and email harvesting${NC}                    ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Certificate analysis and DNS enumeration${NC}                      ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}2)${NC} ${BRIGHT_YELLOW}Network Reconnaissance & Enumeration${NC}                             ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Port scanning and service detection${NC}                           ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• SMB, SNMP and protocol enumeration${NC}                            ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Network vulnerability detection${NC}                               ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}3)${NC} ${BRIGHT_MAGENTA}Web Application Security Testing${NC}                                 ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Directory and file enumeration${NC}                                ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• SQL injection and XSS testing${NC}                                 ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• SSL/TLS analysis and WAF detection${NC}                            ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}├─────────────────────────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_CYAN}4)${NC} ${BRIGHT_RED}Complete Red Team Assessment${NC}                                     ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Combination of all modules above${NC}                              ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Automated attack script generation${NC}                            ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}│${NC}    ${DIM}${GRAY}• Exploitation preparation and persistence${NC}                      ${BRIGHT_WHITE}│${NC}"
-    echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
+    echo -e "${BRIGHT_CYAN}1)${NC} ${BRIGHT_GREEN}OSINT & Information Gathering${NC}"
+    echo -e "   ${DIM}${GRAY}• Passive reconnaissance and public data collection${NC}"
+    echo -e "   ${DIM}${GRAY}• Subdomain enumeration and email harvesting${NC}"
+    echo -e "   ${DIM}${GRAY}• Certificate analysis and DNS enumeration${NC}"
+    echo
+    echo -e "${BRIGHT_CYAN}2)${NC} ${BRIGHT_YELLOW}Network Reconnaissance & Enumeration${NC}"
+    echo -e "   ${DIM}${GRAY}• Port scanning and service detection${NC}"
+    echo -e "   ${DIM}${GRAY}• SMB, SNMP and protocol enumeration${NC}"
+    echo -e "   ${DIM}${GRAY}• Network vulnerability detection${NC}"
+    echo
+    echo -e "${BRIGHT_CYAN}3)${NC} ${BRIGHT_MAGENTA}Web Application Security Testing${NC}"
+    echo -e "   ${DIM}${GRAY}• Directory and file enumeration${NC}"
+    echo -e "   ${DIM}${GRAY}• SQL injection and XSS testing${NC}"
+    echo -e "   ${DIM}${GRAY}• SSL/TLS analysis and WAF detection${NC}"
+    echo
+    echo -e "${BRIGHT_CYAN}4)${NC} ${BRIGHT_RED}Complete Red Team Assessment${NC}"
+    echo -e "   ${DIM}${GRAY}• Combination of all modules above${NC}"
+    echo -e "   ${DIM}${GRAY}• Automated attack script generation${NC}"
+    echo -e "   ${DIM}${GRAY}• Exploitation preparation and persistence${NC}"
     echo
     
     # Active modes display
     if [ "$QUICK_MODE" = true ] || [ "$STEALTH_MODE" = true ]; then
-        echo -e "${BRIGHT_WHITE}┌─────────────────────────────────────────────────────────────────────────────┐${NC}"
-        echo -e "${BRIGHT_WHITE}│${NC}                               ${BRIGHT_YELLOW}ACTIVE MODES${NC}                                ${BRIGHT_WHITE}│${NC}"
-    if [ "$QUICK_MODE" = true ]; then
-            echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}Quick Mode:${NC} Speed-optimized scans                                  ${BRIGHT_WHITE}│${NC}"
-    fi
-    if [ "$STEALTH_MODE" = true ]; then
-            echo -e "${BRIGHT_WHITE}│${NC} ${BRIGHT_BLUE}*${NC} ${BRIGHT_YELLOW}Stealth Mode:${NC} Evasion techniques and discrete scans               ${BRIGHT_WHITE}│${NC}"
-    fi
-        echo -e "${BRIGHT_WHITE}└─────────────────────────────────────────────────────────────────────────────┘${NC}"
-    echo
+        echo -e "${BRIGHT_YELLOW}ACTIVE MODES${NC}"
+        if [ "$QUICK_MODE" = true ]; then
+            echo -e "${BRIGHT_GREEN}*${NC} ${BRIGHT_YELLOW}Quick Mode:${NC} Speed-optimized scans"
+        fi
+        if [ "$STEALTH_MODE" = true ]; then
+            echo -e "${BRIGHT_BLUE}*${NC} ${BRIGHT_YELLOW}Stealth Mode:${NC} Evasion techniques and discrete scans"
+        fi
+        echo
     fi
 }
 
