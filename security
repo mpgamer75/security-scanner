@@ -450,25 +450,25 @@ run_network_scans() {
         # Optimized standard mode - WITH mandatory -Pn
         execute_with_progress "Standard Port Scan" "nmap -Pn -sS -T4 --top-ports 3000 --min-rate=1000 '$target'" 600 "$OUTDIR/network/nmap_standard.txt"
         
-        # Service detection on open ports only - WITH -Pn
-        execute_with_progress "Service Detection" "nmap -Pn -sV -sC --version-intensity 5 --top-ports 1000 '$target'" 900 "$OUTDIR/network/nmap_services.txt"
+        # Service detection on open ports only - WITH -Pn (optimized)
+        execute_with_progress "Service Detection" "nmap -Pn -sV -sC --version-intensity 3 --top-ports 1000 --max-retries 2 --host-timeout 10m '$target'" 1200 "$OUTDIR/network/nmap_services.txt"
     fi
     
     # Critical UDP scan only (optimized) - WITH -Pn
     execute_with_progress "UDP Critical Ports" "nmap -Pn -sU --top-ports 20 '$target'" 300 "$OUTDIR/network/nmap_udp_critical.txt"
     
-    # Lightweight OS detection - WITH -Pn
-    execute_with_progress "OS Fingerprinting" "nmap -Pn -O --osscan-guess --max-os-tries 2 '$target'" 180 "$OUTDIR/network/nmap_os.txt"
+    # Lightweight OS detection - WITH -Pn (optimized)
+    execute_with_progress "OS Fingerprinting" "nmap -Pn -O --osscan-guess --max-os-tries 1 --host-timeout 5m '$target'" 300 "$OUTDIR/network/nmap_os.txt"
     
     # Targeted vulnerability scripts - OPTIMIZED VERSION 2024
-    execute_with_progress "Vulnerability Scripts" "nmap -Pn --script 'vuln and not dos and not intrusive' --script-args vulns.showall --top-ports 1000 '$target'" 600 "$OUTDIR/network/nmap_vulns.txt"
+    execute_with_progress "Vulnerability Scripts" "nmap -Pn --script 'vuln and not dos and not intrusive' --script-args vulns.showall --top-ports 1000 --max-retries 1 --host-timeout 10m '$target'" 900 "$OUTDIR/network/nmap_vulns.txt"
     
     # Specific critical vulnerability scripts
     execute_with_progress "Critical Vulnerability Scan" "nmap -Pn --script 'smb-vuln-*,ssl-*,http-vuln-*' --script-args unsafe=1 '$target'" 400 "$OUTDIR/network/nmap_critical_vulns.txt"
     
-    # Modern vulners script if available
+    # Modern vulners script if available (optimized)
     if nmap --script-help vulners 2>/dev/null | grep -q vulners; then
-        execute_with_progress "Vulners Database Scan" "nmap -Pn -sV --script vulners --script-args mincvss=5.0 '$target'" 300 "$OUTDIR/network/nmap_vulners.txt"
+        execute_with_progress "Vulners Database Scan" "nmap -Pn -sV --script vulners --script-args mincvss=5.0 --top-ports 1000 --max-retries 1 --host-timeout 8m '$target'" 600 "$OUTDIR/network/nmap_vulners.txt"
     fi
     
     # Vulscan if available
@@ -478,14 +478,22 @@ run_network_scans() {
     
     # Complete and optimized SMB enumeration - WITH -Pn
     execute_with_progress "SMB Enumeration" "
-        echo '=== SMB Version Detection ==='
-        nmap -Pn -p 139,445 --script smb-protocols,smb-security-mode,smb-os-discovery '$target'
-        echo -e '\n=== SMB Shares Enumeration ==='
-        nmap -Pn -p 445 --script smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-users '$target'
-        echo -e '\n=== SMB Vulnerability Scan ==='
-        nmap -Pn -p 445 --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-conficker,smb-vuln-cve2009-3103,smb-vuln-ms06-025,smb-vuln-ms07-029,smb-vuln-ms10-054,smb-vuln-ms10-061,smb-vuln-regsvc-dos,smb-vuln-webexec '$target'
-        echo -e '\n=== SMB Brute Force Protection Check ==='
-        nmap -Pn -p 445 --script smb-brute --script-args userdb=users.txt,passdb=passwords.txt,unpwdb.timelimit=30s '$target' 2>/dev/null || echo 'SMB brute force check skipped'
+        echo '=== SMB Port Check ==='
+        smb_check=\$(nmap -Pn -p 139,445 --open '$target' 2>/dev/null | grep -E '139/tcp|445/tcp' | grep -v filtered)
+        if [ -n \"\$smb_check\" ]; then
+            echo 'SMB ports detected, proceeding with enumeration...'
+            echo -e '\n=== SMB Version Detection ==='
+            nmap -Pn -p 139,445 --script smb-protocols,smb-security-mode,smb-os-discovery --host-timeout 3m '$target'
+            echo -e '\n=== SMB Shares Enumeration ==='
+            nmap -Pn -p 445 --script smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-users --host-timeout 3m '$target'
+            echo -e '\n=== SMB Vulnerability Scan ==='
+            nmap -Pn -p 445 --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-conficker,smb-vuln-cve2009-3103,smb-vuln-ms06-025,smb-vuln-ms07-029,smb-vuln-ms10-054,smb-vuln-ms10-061,smb-vuln-regsvc-dos,smb-vuln-webexec --host-timeout 2m '$target'
+            echo -e '\n=== SMB Brute Force Protection Check ==='
+            nmap -Pn -p 445 --script smb-brute --script-args userdb=users.txt,passdb=passwords.txt,unpwdb.timelimit=30s --host-timeout 2m '$target' 2>/dev/null || echo 'SMB brute force check skipped'
+        else
+            echo 'SMB ports (139/445) are filtered or closed - skipping detailed SMB enumeration'
+            nmap -Pn -p 139,445 --script smb-protocols,smb-security-mode,smb-os-discovery --host-timeout 3m '$target'
+        fi
         if command -v enum4linux &> /dev/null; then
             echo -e '\n=== Enum4linux Results ==='
             timeout 120 enum4linux -a '$target' 2>/dev/null || echo 'enum4linux timeout or failed'
@@ -506,6 +514,16 @@ run_web_scans() {
     local url="$1"
     
     echo -e "\n${RED}[WEB]${NC} Starting web application testing..."
+    
+    # Check if web ports are accessible
+    local domain_from_url=$(echo "$url" | sed 's|https\?://||' | sed 's|/.*||')
+    local web_check=$(nmap -Pn -p 80,443,8080,8443 --open "$domain_from_url" 2>/dev/null | grep -E '80/tcp|443/tcp|8080/tcp|8443/tcp' | grep open)
+    
+    if [ -z "$web_check" ]; then
+        echo -e "${YELLOW}[WARNING]${NC} No web ports detected as open, but continuing with web scans..."
+    else
+        echo -e "${GREEN}[INFO]${NC} Web ports detected: $(echo "$web_check" | cut -d'/' -f1 | tr '\n' ' ')"
+    fi
     
     # Enhanced technology detection
     if command -v whatweb &> /dev/null; then
@@ -1001,7 +1019,10 @@ generate_clean_report() {
         for scan_file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/network/nmap_critical_vulns.txt" "$OUTDIR/network/nmap_vulners.txt" "$OUTDIR/network/smb_enum.txt"; do
             if [ -f "$scan_file" ]; then
                 local count=$(grep -c "VULNERABLE\|CRITICAL\|EXPLOITABLE\|CVE.*CRITICAL\|ms17-010\|EternalBlue" "$scan_file" 2>/dev/null || echo "0")
-                critical_findings=$((critical_findings + count))
+                # Vérifier que count est numérique
+                if [[ "$count" =~ ^[0-9]+$ ]]; then
+                    critical_findings=$((critical_findings + count))
+                fi
             fi
         done
         
@@ -1009,7 +1030,10 @@ generate_clean_report() {
         for scan_file in "$OUTDIR/web/nuclei_comprehensive.txt" "$OUTDIR/web/nuclei_quick.txt" "$OUTDIR/web/nikto.txt"; do
             if [ -f "$scan_file" ]; then
                 local count=$(grep -c "critical\|high\|HIGH\|CRITICAL" "$scan_file" 2>/dev/null || echo "0")
-                high_findings=$((high_findings + count))
+                # Vérifier que count est numérique
+                if [[ "$count" =~ ^[0-9]+$ ]]; then
+                    high_findings=$((high_findings + count))
+                fi
             fi
         done
         
@@ -1017,14 +1041,22 @@ generate_clean_report() {
         for scan_file in "$OUTDIR/web/nikto.txt" "$OUTDIR/web/gobuster_common.txt" "$OUTDIR/network/nmap_vulns.txt"; do
             if [ -f "$scan_file" ]; then
                 local count=$(grep -c "OSVDB\|CVE\|medium\|MEDIUM\|WARNING" "$scan_file" 2>/dev/null || echo "0")
-                medium_findings=$((medium_findings + count))
+                # Vérifier que count est numérique
+                if [[ "$count" =~ ^[0-9]+$ ]]; then
+                    medium_findings=$((medium_findings + count))
+                fi
             fi
         done
         
-        # On vérifie que toutes les variables ont une valeur par défaut
+        # Validation finale pour s'assurer que toutes les variables sont numériques
         critical_findings=${critical_findings:-0}
         high_findings=${high_findings:-0}
         medium_findings=${medium_findings:-0}
+        
+        # Double vérification pour éviter les erreurs arithmétiques
+        [[ ! "$critical_findings" =~ ^[0-9]+$ ]] && critical_findings=0
+        [[ ! "$high_findings" =~ ^[0-9]+$ ]] && high_findings=0
+        [[ ! "$medium_findings" =~ ^[0-9]+$ ]] && medium_findings=0
         
         echo "│  Critical Vulnerabilities: $critical_findings"
         echo "│  High Risk Issues: $high_findings"
