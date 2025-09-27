@@ -1021,20 +1021,25 @@ generate_clean_report() {
         local high_findings=0
         local medium_findings=0
         
-        # Debug: Check if directories exist
-        [ -d "$OUTDIR/network" ] || echo "│  Warning: Network scan directory not found"
-        [ -d "$OUTDIR/web" ] || echo "│  Warning: Web scan directory not found"
-        [ -d "$OUTDIR/osint" ] || echo "│  Warning: OSINT scan directory not found"
+        # Check if directories exist (silent check for internal logic)
+        local has_network_data=false
+        local has_web_data=false
+        local has_osint_data=false
         
-        echo "│  Debug: Starting vulnerability counting..."
+        [ -d "$OUTDIR/network" ] && [ "$(ls -A "$OUTDIR/network" 2>/dev/null)" ] && has_network_data=true
+        [ -d "$OUTDIR/web" ] && [ "$(ls -A "$OUTDIR/web" 2>/dev/null)" ] && has_web_data=true
+        [ -d "$OUTDIR/osint" ] && [ "$(ls -A "$OUTDIR/osint" 2>/dev/null)" ] && has_osint_data=true
         
         
         for scan_file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/network/nmap_critical_vulns.txt" "$OUTDIR/network/nmap_vulners.txt" "$OUTDIR/network/smb_enum.txt"; do
             if [ -f "$scan_file" ]; then
-                local count=$(grep -c "VULNERABLE\|CRITICAL\|EXPLOITABLE\|CVE.*CRITICAL\|ms17-010\|EternalBlue" "$scan_file" 2>/dev/null || echo "0")
+                # Count only actual vulnerabilities, exclude "NOT VULNERABLE" entries
+                local count=$(grep -c "VULNERABLE\|CRITICAL\|EXPLOITABLE\|CVE.*CRITICAL\|ms17-010\|EternalBlue" "$scan_file" 2>/dev/null | grep -v "NOT VULNERABLE" || echo "0")
+                # Better pattern: look for actual vulnerability indicators
+                local vuln_count=$(grep -E "(State: VULNERABLE|LIKELY VULNERABLE|CRITICAL|EXPLOITABLE|ms17-010|EternalBlue)" "$scan_file" 2>/dev/null | grep -v "NOT VULNERABLE" | wc -l || echo "0")
                 # Vérifier que count est numérique
-                if [[ "$count" =~ ^[0-9]+$ ]]; then
-                    critical_findings=$((critical_findings + count))
+                if [[ "$vuln_count" =~ ^[0-9]+$ ]]; then
+                    critical_findings=$((critical_findings + vuln_count))
                 fi
             fi
         done
@@ -1042,7 +1047,8 @@ generate_clean_report() {
         # Compte les vulnérabilités web de haute priorité
         for scan_file in "$OUTDIR/web/nuclei_comprehensive.txt" "$OUTDIR/web/nuclei_quick.txt" "$OUTDIR/web/nikto.txt"; do
             if [ -f "$scan_file" ]; then
-                local count=$(grep -c "critical\|high\|HIGH\|CRITICAL" "$scan_file" 2>/dev/null || echo "0")
+                # Count actual high/critical findings, exclude "NOT VULNERABLE"
+                local count=$(grep -E "(critical|high|HIGH|CRITICAL)" "$scan_file" 2>/dev/null | grep -v "NOT VULNERABLE" | wc -l || echo "0")
                 # Vérifier que count est numérique
                 if [[ "$count" =~ ^[0-9]+$ ]]; then
                     high_findings=$((high_findings + count))
@@ -1053,7 +1059,8 @@ generate_clean_report() {
         
         for scan_file in "$OUTDIR/web/nikto.txt" "$OUTDIR/web/gobuster_common.txt" "$OUTDIR/network/nmap_vulns.txt"; do
             if [ -f "$scan_file" ]; then
-                local count=$(grep -c "OSVDB\|CVE\|medium\|MEDIUM\|WARNING" "$scan_file" 2>/dev/null || echo "0")
+                # Count actual medium findings, exclude "NOT VULNERABLE"
+                local count=$(grep -E "(OSVDB|CVE|medium|MEDIUM|WARNING)" "$scan_file" 2>/dev/null | grep -v "NOT VULNERABLE" | wc -l || echo "0")
                 # Vérifier que count est numérique
                 if [[ "$count" =~ ^[0-9]+$ ]]; then
                     medium_findings=$((medium_findings + count))
@@ -1071,7 +1078,6 @@ generate_clean_report() {
         [[ ! "$high_findings" =~ ^[0-9]+$ ]] && high_findings=0
         [[ ! "$medium_findings" =~ ^[0-9]+$ ]] && medium_findings=0
         
-        echo "│  Debug: Vulnerability counting completed"
         echo "│  Critical Vulnerabilities: $critical_findings"
         echo "│  High Risk Issues: $high_findings"
         echo "│  Medium Risk Issues: $medium_findings"
@@ -1099,6 +1105,12 @@ generate_clean_report() {
         if [ "$medium_findings" -gt 0 ] 2>/dev/null; then
             risk_score=$((risk_score + medium_findings * 2))
         fi
+        
+        # Cap risk score at 100
+        if [ "$risk_score" -gt 100 ]; then
+            risk_score=100
+        fi
+        
         echo "│  Risk Score: $risk_score/100"
         
         if [ $risk_score -ge 70 ]; then
@@ -1113,8 +1125,6 @@ generate_clean_report() {
         
         echo "└──────────────────────────────────────────────────────────────────────────────┘"
         echo
-        
-        echo "│  Debug: Executive summary completed, starting detailed analysis..."
         
         # Analyse détaillée des résultats
         if [ -d "$OUTDIR/osint" ] && [ "$(ls -A "$OUTDIR/osint" 2>/dev/null)" ]; then
@@ -1489,17 +1499,19 @@ generate_json_report() {
         echo "  \"raw_data\": {"
         echo "    \"open_ports\": ["
         
-        # Extraire tous les ports ouverts de tous les scans
-        local first_port=true
+        # Extraire tous les ports ouverts de tous les scans (sans doublons)
+        local temp_ports=$(mktemp)
         for scan_file in "$OUTDIR/network"/*.txt; do
             if [ -f "$scan_file" ]; then
-                grep "open" "$scan_file" 2>/dev/null | grep -oP "\\d+/tcp" | while read port; do
-                    [ "$first_port" = false ] && echo ","
-                    echo -n "      \"$port\""
-                    first_port=false
-                done
+                grep "open" "$scan_file" 2>/dev/null | grep -oP "\\d+/tcp" >> "$temp_ports" 2>/dev/null || true
             fi
         done
+        
+        # Remove duplicates and format as JSON array
+        if [ -s "$temp_ports" ]; then
+            sort -u "$temp_ports" | sed 's/^/      "/' | sed 's/$/"/' | sed '$!s/$/,/'
+        fi
+        rm -f "$temp_ports"
         
         echo
         echo "    ],"
