@@ -992,6 +992,12 @@ generate_clean_report() {
     
     echo -e "${CYAN}[INFO]${NC} Generating executive summary report..."
     
+    # Ensure report directory exists
+    mkdir -p "$OUTDIR/reports"
+    
+    # Add error handling and debug
+    set +e  # Don't exit on errors during report generation
+    
     {
         echo "╔══════════════════════════════════════════════════════════════════════════════╗"
         echo "║                       RED TEAM ASSESSMENT REPORT                            ║"
@@ -1010,10 +1016,17 @@ generate_clean_report() {
         
         echo "┌─ EXECUTIVE SUMMARY ───────────────────────────────────────────────────────────┐"
         
-        # Compte les découvertes critiques 
+        # Initialize counters with error handling
         local critical_findings=0
         local high_findings=0
         local medium_findings=0
+        
+        # Debug: Check if directories exist
+        [ -d "$OUTDIR/network" ] || echo "│  Warning: Network scan directory not found"
+        [ -d "$OUTDIR/web" ] || echo "│  Warning: Web scan directory not found"
+        [ -d "$OUTDIR/osint" ] || echo "│  Warning: OSINT scan directory not found"
+        
+        echo "│  Debug: Starting vulnerability counting..."
         
         
         for scan_file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/network/nmap_critical_vulns.txt" "$OUTDIR/network/nmap_vulners.txt" "$OUTDIR/network/smb_enum.txt"; do
@@ -1058,6 +1071,7 @@ generate_clean_report() {
         [[ ! "$high_findings" =~ ^[0-9]+$ ]] && high_findings=0
         [[ ! "$medium_findings" =~ ^[0-9]+$ ]] && medium_findings=0
         
+        echo "│  Debug: Vulnerability counting completed"
         echo "│  Critical Vulnerabilities: $critical_findings"
         echo "│  High Risk Issues: $high_findings"
         echo "│  Medium Risk Issues: $medium_findings"
@@ -1099,6 +1113,8 @@ generate_clean_report() {
         
         echo "└──────────────────────────────────────────────────────────────────────────────┘"
         echo
+        
+        echo "│  Debug: Executive summary completed, starting detailed analysis..."
         
         # Analyse détaillée des résultats
         if [ -d "$OUTDIR/osint" ] && [ "$(ls -A "$OUTDIR/osint" 2>/dev/null)" ]; then
@@ -1324,16 +1340,82 @@ generate_clean_report() {
         echo "║              Red Team Security Scanner v$VERSION - Professional Report             ║"
         echo "╚══════════════════════════════════════════════════════════════════════════════╝"
         
-    } > "$report_file"
+    } > "$report_file" 2>/dev/null
+    
+    # Check if report was generated successfully
+    if [ -f "$report_file" ] && [ -s "$report_file" ]; then
+        echo -e "${GREEN}[REPORT]${NC} Executive summary report: ${WHITE}$report_file${NC}"
+        local line_count=$(wc -l < "$report_file")
+        echo -e "${CYAN}[INFO]${NC} Report contains $line_count lines"
+    else
+        echo -e "${RED}[ERROR]${NC} Failed to generate executive summary report"
+        return 1
+    fi
     
     # Also generate JSON report for automation
-    generate_json_report
+    echo -e "${CYAN}[INFO]${NC} Generating JSON report..."
+    if ! generate_json_report; then
+        echo -e "${YELLOW}[WARNING]${NC} JSON report generation failed, but continuing..."
+    fi
     
-    echo -e "${GREEN}[REPORT]${NC} Executive summary report: ${WHITE}$report_file${NC}"
+    # Generate a simple backup report if main report failed
+    if [ ! -s "$report_file" ]; then
+        echo -e "${YELLOW}[WARNING]${NC} Main report is empty, generating backup report..."
+        generate_backup_report
+    fi
+    
+    # Restore error handling
+    set -e
+}
+
+generate_backup_report() {
+    local backup_file="$OUTDIR/reports/backup_summary.txt"
+    
+    echo -e "${CYAN}[INFO]${NC} Generating backup report..."
+    
+    {
+        echo "RED TEAM ASSESSMENT BACKUP REPORT"
+        echo "=================================="
+        echo
+        echo "Target: $TARGET"
+        [ -n "$URL" ] && echo "URL: $URL"
+        [ -n "$DOMAIN" ] && echo "Domain: $DOMAIN"
+        echo "Date: $(date)"
+        echo "Version: $VERSION"
+        echo
+        
+        echo "SCAN RESULTS SUMMARY:"
+        echo "--------------------"
+        
+        # List all result files
+        if [ -d "$OUTDIR" ]; then
+            echo "Generated files:"
+            find "$OUTDIR" -name "*.txt" -type f | while read file; do
+                if [ -s "$file" ]; then
+                    local size=$(wc -l < "$file" 2>/dev/null || echo "0")
+                    echo "  - $(basename "$file"): $size lines"
+                fi
+            done
+        fi
+        
+        echo
+        echo "DIRECTORIES:"
+        ls -la "$OUTDIR" 2>/dev/null || echo "No output directory found"
+        
+        echo
+        echo "This is a backup report generated due to main report failure."
+        echo "Check individual scan files for detailed results."
+        
+    } > "$backup_file"
+    
+    echo -e "${GREEN}[REPORT]${NC} Backup report generated: ${WHITE}$backup_file${NC}"
 }
 
 generate_json_report() {
     local json_file="$OUTDIR/reports/assessment_results.json"
+    
+    # Ensure report directory exists
+    mkdir -p "$OUTDIR/reports"
     
     {
         echo "{"
@@ -1440,9 +1522,22 @@ generate_json_report() {
         echo "  }"
         echo "}"
         
-    } > "$json_file"
+    } > "$json_file" 2>/dev/null
     
-    echo -e "${GREEN}[REPORT]${NC} JSON report generated: ${WHITE}$json_file${NC}"
+    # Check if JSON report was generated successfully
+    if [ -f "$json_file" ] && [ -s "$json_file" ]; then
+        echo -e "${GREEN}[REPORT]${NC} JSON report generated: ${WHITE}$json_file${NC}"
+        # Validate JSON format if jq is available
+        if command -v jq &> /dev/null; then
+            if jq empty "$json_file" 2>/dev/null; then
+                echo -e "${CYAN}[INFO]${NC} JSON format validated successfully"
+            else
+                echo -e "${YELLOW}[WARNING]${NC} JSON format validation failed"
+            fi
+        fi
+    else
+        echo -e "${RED}[ERROR]${NC} Failed to generate JSON report"
+    fi
 }
 
 # Validate report generation
