@@ -1,5 +1,3 @@
-# Security Scanner 
-
 <p align="center">
   <img src="images_readme/logo7.png" alt="Logo" width="250"/>
 </p>
@@ -7,12 +5,11 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-2.3.0-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
-  <img src="https://img.shields.io/badge/Performance-+300%25-orange?style=for-the-badge" alt="Performance">
   <img src="https://img.shields.io/badge/Platform-Linux-blue?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-**Security Scanner**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
+**Security Scanner v2.3.0**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
 
 ## What's New in v2.3.0
 
