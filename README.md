@@ -1,4 +1,4 @@
-# Security Scanner v2.3.0 - Performance & Reliability Optimized
+# Security Scanner 
 
 <p align="center">
   <img src="images_readme/logo7.png" alt="Logo" width="250"/>
