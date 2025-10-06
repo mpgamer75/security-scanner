@@ -916,11 +916,37 @@ Generated: $(date '+%Y-%m-%d %H:%M:%S')
 Target: $target
 
 --- Open Services and Ports ---
-PORTS_DATA
+ATTACK_END
+
+if [ -f '$OUTDIR/network/nmap_ports.txt' ]; then
+    grep 'open' '$OUTDIR/network/nmap_ports.txt' 2>/dev/null | head -30 >> $OUTDIR/exploit/attack_surface.txt || echo 'No port data' >> $OUTDIR/exploit/attack_surface.txt
+else
+    echo 'No port scan results' >> $OUTDIR/exploit/attack_surface.txt
+fi
+
+cat >> $OUTDIR/exploit/attack_surface.txt << 'ATTACK2_END'
+
 --- Service Versions ---
-SERVICES_DATA
+ATTACK2_END
+
+if [ -f '$OUTDIR/network/nmap_services.txt' ]; then
+    grep -E 'open.*version' '$OUTDIR/network/nmap_services.txt' 2>/dev/null | head -20 >> $OUTDIR/exploit/attack_surface.txt || echo 'No version data' >> $OUTDIR/exploit/attack_surface.txt
+else
+    echo 'No service detection results' >> $OUTDIR/exploit/attack_surface.txt
+fi
+
+cat >> $OUTDIR/exploit/attack_surface.txt << 'ATTACK3_END'
+
 --- Critical Vulnerabilities ---
-VULNS_DATA
+ATTACK3_END
+
+if [ -f '$OUTDIR/network/nmap_vulns.txt' ]; then
+    grep -i 'VULNERABLE\|CRITICAL\|HIGH' '$OUTDIR/network/nmap_vulns.txt' 2>/dev/null | head -15 >> $OUTDIR/exploit/attack_surface.txt || echo 'No critical vulns detected' >> $OUTDIR/exploit/attack_surface.txt
+else
+    echo 'No vulnerability scan results' >> $OUTDIR/exploit/attack_surface.txt
+fi
+
+cat >> $OUTDIR/exploit/attack_surface.txt << 'ATTACK4_END'
 
 === ATTACK VECTOR ANALYSIS ===
 
@@ -968,26 +994,7 @@ VULNS_DATA
 2. Lateral Movement
 3. Persistence Mechanisms
 4. Data Exfiltration
-ATTACK_END
-
-# Insert actual data
-if [ -f '$OUTDIR/network/nmap_ports.txt' ]; then
-    sed -i 's/PORTS_DATA/$(grep \"open\" $OUTDIR\\/network\\/nmap_ports.txt 2>\\/dev\\/null | head -30 || echo \"No port data\")/' $OUTDIR/exploit/attack_surface.txt
-else
-    sed -i 's/PORTS_DATA/No port scan results/' $OUTDIR/exploit/attack_surface.txt
-fi
-
-if [ -f '$OUTDIR/network/nmap_services.txt' ]; then
-    sed -i 's/SERVICES_DATA/$(grep -E \"open.*version\" $OUTDIR\\/network\\/nmap_services.txt 2>\\/dev\\/null | head -20 || echo \"No version data\")/' $OUTDIR/exploit/attack_surface.txt
-else
-    sed -i 's/SERVICES_DATA/No service detection results/' $OUTDIR/exploit/attack_surface.txt
-fi
-
-if [ -f '$OUTDIR/network/nmap_vulns.txt' ]; then
-    sed -i 's/VULNS_DATA/$(grep -i \"VULNERABLE\\|CRITICAL\\|HIGH\" $OUTDIR\\/network\\/nmap_vulns.txt 2>\\/dev\\/null | head -15 || echo \"No critical vulns detected\")/' $OUTDIR/exploit/attack_surface.txt
-else
-    sed -i 's/VULNS_DATA/No vulnerability scan results/' $OUTDIR/exploit/attack_surface.txt
-fi
+ATTACK4_END
 
 cat $OUTDIR/exploit/attack_surface.txt" \
             $TIMEOUT_SHORT "$OUTDIR/exploit/attack_surface.txt"
