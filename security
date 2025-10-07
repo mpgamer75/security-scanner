@@ -1,19 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-# ============================================================================
-# SECURITY SCANNER v2.3.0 - COMPLETE & OPTIMIZED (2000+ LINES)
-# ============================================================================
-# Full-featured red team assessment tool with performance optimizations
-# - All original features preserved (OSINT, Network, Web, Exploitation)
-# - 60% faster with smart timeouts
-# - Anti-blocking mechanisms (-Pn forced)
-# - Guaranteed report generation
-# - SMB enumeration FIXED
-# - ALL MODES WORKING: -q (quick), -s (stealth), -a (aggressive)
-# ============================================================================
+# =============================================================================
+# Security Scanner v2.3.0 - Red Team Tool
+# =============================================================================
+# Un outil complet pour les tests d'intrusion et red team ops
+# Contient tout ce qu'il faut: OSINT, scan réseau, tests web, exploitation
+# 
+# Optimisé pour être rapide (environ 60% plus rapide qu'avant)
+# Anti-blocage activé par défaut avec -Pn sur nmap
+# L'enum SMB a été fixé (enfin!)
+# Tous les modes fonctionnent: -q (rapide), -s (discret), -a (bourrin)
+# =============================================================================
 
-# Couleurs (thème hacker rouge/orange)
+# Palette de couleurs pour l'interface (rouge/orange style hacker)
 RED='\033[0;31m'
 DARK_RED='\033[38;5;124m'
 ORANGE='\033[38;5;208m'
@@ -29,7 +29,7 @@ NC='\033[0m'
 
 VERSION="2.3.0"
 
-# Variables globales
+# Vars globales du script
 SCAN_INTERRUPTED=false
 CURRENT_SCAN=""
 OUTDIR=""
@@ -40,7 +40,7 @@ QUICK_MODE=false
 STEALTH_MODE=false
 AGGRESSIVE_MODE=false
 
-# Timeouts optimisés (réduits de 60%)
+# Timeouts ajustés - j'ai réduit de 60% pour que ce soit plus rapide
 TIMEOUT_VERY_SHORT=15
 TIMEOUT_SHORT=30
 TIMEOUT_MEDIUM=120
@@ -169,7 +169,7 @@ prepare_output() {
     echo -e "${GREEN}[READY]${NC} Output directory: ${WHITE}$OUTDIR${NC}"
 }
 
-# Fonction d'exécution optimisée avec progress et anti-blocage
+# Fonction principale pour lancer les scans avec progress bar et gestion des timeouts
 execute_scan() {
     local name="$1"
     local command="$2"
@@ -180,16 +180,18 @@ execute_scan() {
     CURRENT_SCAN="$name"
     echo -e "${ORANGE}[SCAN]${NC} $name ${DIM}(timeout: ${timeout}s)${NC}"
     
-    # Progress indicator
+    # Petit spinner pour montrer que ça bosse
     (
         local elapsed=0
         local spinner=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
         while [ $elapsed -lt $timeout ] && kill -0 $$ 2>/dev/null; do
-            printf "\r${YELLOW}${spinner[$((elapsed % 10))]}${NC} ${name} ${DIM}[%02d:%02d]${NC}" \
+            local idx=$((elapsed % 10))
+            printf "\r${YELLOW}${spinner[$idx]}${NC} ${name} ${DIM}[%02d:%02d]${NC}  " \
                    $((elapsed/60)) $((elapsed%60))
             sleep 1
             ((elapsed++))
         done
+        printf "\r%-80s\r" " "  # Nettoie la ligne proprement
     ) &
     local progress_pid=$!
     
@@ -283,12 +285,12 @@ run_osint_scans() {
     echo
     
     if [ -n "$domain" ]; then
-        # WHOIS
+        # Requête WHOIS basique
         execute_scan "WHOIS Lookup" \
             "whois '$domain' 2>/dev/null || echo 'WHOIS query failed'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/whois.txt"
         
-        # DNS enumeration complète
+        # Enum DNS complète - tous les types d'enregistrements
         execute_scan "DNS Enumeration" \
             "echo '=== A Records ===' && dig +short '$domain' A 2>/dev/null
              echo -e '\n=== MX Records ===' && dig +short '$domain' MX 2>/dev/null
@@ -299,7 +301,7 @@ run_osint_scans() {
              echo -e '\n=== SOA Record ===' && dig +short '$domain' SOA 2>/dev/null" \
             $TIMEOUT_SHORT "$OUTDIR/osint/dns_enum.txt"
         
-        # Subdomain enumeration (tous les outils en parallèle)
+        # Recherche de subdomains avec tous les outils dispo
         if command -v subfinder &> /dev/null; then
             execute_scan "Subfinder Discovery" \
                 "subfinder -d '$domain' -all -silent -t 50 -timeout 5 2>/dev/null | head -500 || echo 'Subfinder failed'" \
@@ -326,7 +328,7 @@ run_osint_scans() {
                 $TIMEOUT_MEDIUM "$OUTDIR/osint/subdomains_findomain.txt"
         fi
         
-        # CORRECTION: Consolidation des subdomains (syntaxe corrigée)
+        # On consolide tous les subdomains trouvés dans un seul fichier
         execute_scan "Subdomain Consolidation" \
             "cat $OUTDIR/osint/subdomains_*.txt 2>/dev/null | sort -u | grep -v '^$' | grep -v 'failed' > $OUTDIR/osint/all_subdomains.txt
              total_subs=\$(wc -l < $OUTDIR/osint/all_subdomains.txt 2>/dev/null || echo 0)
@@ -336,14 +338,14 @@ run_osint_scans() {
              head -20 $OUTDIR/osint/all_subdomains.txt 2>/dev/null || echo 'No subdomains found'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/subdomain_summary.txt"
         
-        # Certificate transparency
+        # Lookup sur crt.sh pour les certificats SSL historiques
         execute_scan "Certificate Transparency" \
             "curl -m 30 -s 'https://crt.sh/?q=%.$domain&output=json' 2>/dev/null | \
              grep -oP '\"name_value\":\"\\K[^\"]+' | sed 's/\\*\\.//g' | sort -u | head -300 || \
              echo 'Certificate transparency lookup failed'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/crt_sh.txt"
         
-        # Email harvesting
+        # Extraction d'emails avec theHarvester
         if command -v theHarvester &> /dev/null; then
             execute_scan "Email Harvesting (theHarvester)" \
                 "theHarvester -d '$domain' -l 200 -b google,bing,yahoo,duckduckgo,hunter 2>/dev/null || \
@@ -356,7 +358,7 @@ run_osint_scans() {
                 $TIMEOUT_LONG "$OUTDIR/osint/emails_legacy.txt"
         fi
         
-        # Google dorking COMPLET
+        # Génération des Google dorks - liste complète de requêtes
         execute_scan "Google Dork Generation" \
             "cat > $OUTDIR/osint/google_dorks.txt << 'DORKS_END'
 === GOOGLE DORKS FOR $domain ===
@@ -435,7 +437,7 @@ DORKS_END
 cat $OUTDIR/osint/google_dorks.txt" \
             $TIMEOUT_VERY_SHORT "$OUTDIR/osint/google_dorks.txt"
         
-        # Shodan si disponible
+        # Shodan search si l'outil est installé
         if command -v shodan &> /dev/null; then
             execute_scan "Shodan Search" \
                 "echo '=== Shodan Domain Search ===' && \
@@ -445,14 +447,14 @@ cat $OUTDIR/osint/google_dorks.txt" \
                 $TIMEOUT_MEDIUM "$OUTDIR/osint/shodan.txt"
         fi
         
-        # Wayback Machine
+        # Récup des URLs archivées sur Wayback
         execute_scan "Wayback Machine URLs" \
             "echo '=== Wayback Machine Historical URLs ===' && \
              curl -m 45 -s 'http://web.archive.org/cdx/search/cdx?url=*.$domain/*&output=text&fl=original&collapse=urlkey' 2>/dev/null | \
              head -200 || echo 'Wayback Machine lookup failed'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/wayback_urls.txt"
         
-        # Social media reconnaissance
+        # Liste des profils sociaux à checker manuellement
         execute_scan "Social Media Reconnaissance" \
             "cat > $OUTDIR/osint/social_media.txt << 'SOCIAL_END'
 === SOCIAL MEDIA PROFILES TO CHECK ===
@@ -495,12 +497,12 @@ cat $OUTDIR/osint/social_media.txt" \
     fi
     
     if [ -n "$target" ]; then
-        # Reverse DNS
+        # Lookup DNS inverse sur l'IP
         execute_scan "Reverse DNS Lookup" \
             "dig +short -x '$target' 2>/dev/null || echo 'No PTR record found'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/reverse_dns.txt"
         
-        # IP Geolocation
+        # Geoloc de l'IP via ip-api
         execute_scan "IP Geolocation" \
             "curl -m 10 -s 'http://ip-api.com/json/$target' 2>/dev/null || echo 'Geolocation lookup failed'" \
             $TIMEOUT_VERY_SHORT "$OUTDIR/osint/geolocation.txt"
@@ -517,7 +519,7 @@ run_network_scans() {
     echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
     echo
     
-    # Configuration selon le mode
+    # Config des paramètres nmap selon le mode choisi
     local nmap_timing="-T4"
     local port_range="--top-ports 1000"
     local max_retries="--max-retries 1"
@@ -540,32 +542,32 @@ run_network_scans() {
         min_rate="--min-rate 5000"
     fi
     
-    # Host discovery FORCÉ avec -Pn
+    # Découverte des hosts - on force -Pn pour éviter les blocages
     execute_scan "Host Discovery" \
         "nmap -Pn -sn $nmap_timing $min_rate '$target' 2>/dev/null || echo 'Host: $target (assuming online)'" \
         $TIMEOUT_SHORT "$OUTDIR/network/host_discovery.txt"
     
-    # RustScan si disponible (ultra-rapide)
+    # RustScan si dispo - c'est hyper rapide ce truc
     if command -v rustscan &> /dev/null && [ "$QUICK_MODE" = true ]; then
         execute_scan "RustScan Ultra-Fast" \
             "rustscan -a '$target' --ulimit 5000 2>/dev/null || echo 'RustScan failed'" \
             $TIMEOUT_MEDIUM "$OUTDIR/network/rustscan.txt"
     fi
     
-    # Masscan si disponible (très rapide)
+    # Masscan pour les scans rapides (mode agressif seulement)
     if command -v masscan &> /dev/null && [ "$AGGRESSIVE_MODE" = true ]; then
         execute_scan "Masscan High-Speed" \
             "sudo masscan '$target' -p1-65535 --rate=10000 2>/dev/null || echo 'Masscan failed (requires root)'" \
             $TIMEOUT_LONG "$OUTDIR/network/masscan.txt"
     fi
     
-    # Port scan principal OPTIMISÉ avec -Pn FORCÉ
+    # Scan de ports principal - optimisé avec -Pn toujours activé
     execute_scan "Port Scanning (TCP SYN)" \
         "nmap -Pn -sS $nmap_timing $port_range $min_rate $max_retries \
          --host-timeout 5m --defeat-rst-ratelimit '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_ports.txt" true
     
-    # Service detection OPTIMISÉ
+    # Détection des services et versions qui tournent
     local service_timeout=$TIMEOUT_LONG
     [ "$QUICK_MODE" = true ] && service_timeout=$TIMEOUT_MEDIUM
     
@@ -574,7 +576,7 @@ run_network_scans() {
          $max_retries --host-timeout 10m '$target' 2>/dev/null" \
         $service_timeout "$OUTDIR/network/nmap_services.txt"
     
-    # UDP scan (ports critiques uniquement)
+    # Scan UDP sur les ports critiques uniquement (c'est lent l'UDP)
     if [ "$QUICK_MODE" != true ]; then
         execute_scan "UDP Critical Ports" \
             "sudo nmap -Pn -sU --top-ports 20 -T4 --max-retries 0 --host-timeout 3m '$target' 2>/dev/null || \
@@ -582,25 +584,25 @@ run_network_scans() {
             $TIMEOUT_MEDIUM "$OUTDIR/network/nmap_udp.txt"
     fi
     
-    # OS fingerprinting
+    # Détection de l'OS de la cible
     execute_scan "OS Fingerprinting" \
         "sudo nmap -Pn -O --osscan-guess --max-os-tries 1 --host-timeout 3m '$target' 2>/dev/null || \
          nmap -Pn -O --osscan-guess --max-os-tries 1 --host-timeout 3m '$target' 2>/dev/null" \
         $TIMEOUT_MEDIUM "$OUTDIR/network/nmap_os.txt"
     
-    # Vulnerability scanning OPTIMISÉ
+    # Scan de vulns avec les scripts NSE
     execute_scan "Vulnerability Detection (NSE)" \
         "nmap -Pn -sV --script 'vuln and not dos and not intrusive' --script-timeout 90s \
          --top-ports 500 $max_retries --host-timeout 10m '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_vulns.txt"
     
-    # Scripts critiques spécifiques
+    # Scripts NSE pour les vulns critiques (SMB, SSL, HTTP)
     execute_scan "Critical Vulnerability Scan" \
         "nmap -Pn --script 'smb-vuln-*,ssl-*,http-vuln-*' --script-timeout 60s \
          --script-args unsafe=1 --host-timeout 8m '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_critical_vulns.txt"
     
-    # SMB enumeration COMPLÈTE et ROBUSTE (FIXED)
+    # Enum SMB complète - j'ai enfin réussi à fix les bugs
     execute_scan "SMB Enumeration (ROBUST)" \
         "smb_check=\$(timeout 30 nmap -Pn -p 139,445 --open '$target' 2>/dev/null | grep -E '139/tcp|445/tcp' | grep open)
          if [ -n \"\$smb_check\" ]; then
@@ -637,13 +639,13 @@ run_network_scans() {
          fi" \
         $TIMEOUT_VERY_LONG "$OUTDIR/network/smb_enum.txt"
     
-    # SNMP enumeration
+    # Enum SNMP sur le port 161
     execute_scan "SNMP Enumeration" \
         "timeout 90 nmap -Pn -sU -p 161 --script snmp-info,snmp-sysdescr,snmp-processes,snmp-netstat \
          --script-timeout 30s '$target' 2>/dev/null || echo 'SNMP not accessible'" \
         $TIMEOUT_MEDIUM "$OUTDIR/network/snmp_enum.txt"
     
-    # Banner grabbing
+    # Récup des bannières sur les ports communs
     execute_scan "Banner Grabbing" \
         "for port in 21 22 23 25 80 110 143 443 3306 5432 8080; do
              echo \"=== Port \$port ===\"
@@ -664,27 +666,27 @@ run_web_scans() {
     
     local domain=$(echo "$url" | sed 's|https\?://||' | sed 's|/.*||')
     
-    # Vérifier accessibilité web
+    # Check rapide des ports web ouverts
     execute_scan "Web Port Check" \
         "timeout 30 nmap -Pn -p 80,443,8080,8443 --open '$domain' 2>/dev/null | \
          grep -E 'open' || echo 'No standard web ports detected (continuing anyway)'" \
         $TIMEOUT_SHORT "$OUTDIR/web/port_check.txt"
     
-    # Technology detection
+    # Détection des technos web avec WhatWeb
     if command -v whatweb &> /dev/null; then
         execute_scan "Technology Detection (WhatWeb)" \
             "whatweb -a 3 -v --max-threads 20 '$url' 2>/dev/null || echo 'WhatWeb failed'" \
             $TIMEOUT_MEDIUM "$OUTDIR/web/whatweb.txt"
     fi
     
-    # WAF detection
+    # Détection de WAF avec wafw00f
     if command -v wafw00f &> /dev/null; then
         execute_scan "WAF Detection (wafw00f)" \
             "wafw00f '$url' 2>/dev/null || echo 'wafw00f failed'" \
             $TIMEOUT_SHORT "$OUTDIR/web/wafw00f.txt"
     fi
     
-    # SSL/TLS analysis COMPLÈTE
+    # Analyse SSL/TLS complète (certif, ciphers, vulns)
     execute_scan "SSL/TLS Analysis" \
         "echo '=== Certificate Information ==='
          echo | timeout 20 openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | \
@@ -703,7 +705,7 @@ run_web_scans() {
          fi" \
         $TIMEOUT_LONG "$OUTDIR/web/ssl_analysis.txt"
     
-    # Directory enumeration
+    # Bruteforce de répertoires avec gobuster
     local wordlist_dir="/usr/share/wordlists/dirb"
     [ ! -d "$wordlist_dir" ] && wordlist_dir="$HOME/.local/share/wordlists/dirb"
     
@@ -732,7 +734,7 @@ run_web_scans() {
         fi
     fi
     
-    # Vulnerability scanning avec Nuclei
+    # Scan de vulns web avec Nuclei - super outil
     if command -v nuclei &> /dev/null; then
         local severity="-severity critical,high,medium"
         local nuclei_timeout=$TIMEOUT_LONG
@@ -751,7 +753,7 @@ run_web_scans() {
             $nuclei_timeout "$OUTDIR/web/nuclei.txt"
     fi
     
-    # Nikto scan
+    # Scan Nikto pour les vulns web classiques
     if command -v nikto &> /dev/null && [ "$QUICK_MODE" != true ]; then
         local nikto_timeout=$TIMEOUT_LONG
         [ "$AGGRESSIVE_MODE" = true ] && nikto_timeout=$TIMEOUT_VERY_LONG
@@ -761,7 +763,7 @@ run_web_scans() {
             $nikto_timeout "$OUTDIR/web/nikto.txt"
     fi
     
-    # SQLMap
+    # Tests d'injection SQL avec sqlmap
     if command -v sqlmap &> /dev/null; then
         mkdir -p "$OUTDIR/web/sqlmap"
         
@@ -785,7 +787,7 @@ run_web_scans() {
             $sqlmap_timeout "$OUTDIR/web/sqlmap.log"
     fi
     
-    # XSS payload testing
+    # Génération de payloads XSS pour les tests manuels
     execute_scan "XSS Payload Generation" \
         "cat > $OUTDIR/web/xss_payloads.txt << 'XSS_END'
 === XSS TESTING PAYLOADS ===
@@ -832,7 +834,7 @@ run_exploitation_prep() {
     echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
     echo
     
-    # Exploit database search COMPLET
+    # Recherche d'exploits dans la database searchsploit
     if command -v searchsploit &> /dev/null; then
         execute_scan "Exploit Database Search (searchsploit)" \
             "if [ -f '$OUTDIR/network/nmap_services.txt' ]; then
@@ -860,7 +862,7 @@ run_exploitation_prep() {
             $TIMEOUT_LONG "$OUTDIR/exploit/searchsploit.txt"
     fi
     
-    # Metasploit module preparation COMPLET
+    # Préparation des modules Metasploit à utiliser
     execute_scan "Metasploit Module Preparation" \
         "cat > $OUTDIR/exploit/msf_prep.txt << 'MSF_END'
 === METASPLOIT FRAMEWORK MODULE SUGGESTIONS ===
@@ -908,7 +910,7 @@ MSF_END
 cat $OUTDIR/exploit/msf_prep.txt" \
             $TIMEOUT_VERY_SHORT "$OUTDIR/exploit/msf_prep.txt"
     
-    # Attack surface analysis DÉTAILLÉE
+    # Analyse de la surface d'attaque avec les résultats des scans
     execute_scan "Attack Surface Analysis" \
         "cat > $OUTDIR/exploit/attack_surface.txt << 'ATTACK_END'
 === COMPREHENSIVE ATTACK SURFACE ANALYSIS ===
@@ -999,7 +1001,7 @@ ATTACK4_END
 cat $OUTDIR/exploit/attack_surface.txt" \
             $TIMEOUT_SHORT "$OUTDIR/exploit/attack_surface.txt"
     
-    # Automated attack scripts COMPLETS
+    # Génération de scripts d'attaque automatisés
     execute_scan "Generate Automated Attack Scripts" \
         "cat > $OUTDIR/exploit/auto_attack.sh << 'AUTOATTACK_END'
 #!/bin/bash
@@ -1055,7 +1057,7 @@ chmod +x $OUTDIR/exploit/auto_attack.sh
 cat $OUTDIR/exploit/auto_attack.sh" \
             $TIMEOUT_SHORT "$OUTDIR/exploit/auto_attack.sh"
     
-    # Credentials database EXHAUSTIVE
+    # Base de données de credentials par défaut
     execute_scan "Generate Default Credentials Database" \
         "cat > $OUTDIR/exploit/credentials.txt << 'CREDS_END'
 === COMPREHENSIVE DEFAULT CREDENTIALS DATABASE ===
@@ -1107,7 +1109,7 @@ CREDS_END
 cat $OUTDIR/exploit/credentials.txt" \
             $TIMEOUT_VERY_SHORT "$OUTDIR/exploit/credentials.txt"
     
-    # Post-exploitation scripts COMPLETS
+    # Scripts de post-exploitation pour enum système
     execute_scan "Generate Post-Exploitation Scripts" \
         "cat > $OUTDIR/exploit/post_exploit.sh << 'POSTEXPLOIT_END'
 #!/bin/bash
@@ -1160,7 +1162,7 @@ chmod +x $OUTDIR/exploit/post_exploit.sh
 cat $OUTDIR/exploit/post_exploit.sh" \
             $TIMEOUT_SHORT "$OUTDIR/exploit/post_exploit.sh"
     
-    # Persistence techniques COMPLÈTES
+    # Techniques de persistence - 7 méthodes différentes
     execute_scan "Generate Persistence Techniques" \
         "cat > $OUTDIR/exploit/persistence.sh << 'PERSISTENCE_END'
 #!/bin/bash
@@ -1249,7 +1251,7 @@ generate_report() {
 ╚════════════════════════════════════════════════════════════════════════════╝
 REPORT_HEADER_END
     
-    # Section: Target Information
+    # Section infos sur la cible
     {
         echo
         echo "┌─ TARGET INFORMATION ───────────────────────────────────────────────────────┐"
@@ -1265,17 +1267,17 @@ REPORT_HEADER_END
         echo
     } >> "$report" 2>/dev/null
     
-    # Section: Executive Summary (comptage sécurisé)
+    # Section résumé exécutif avec comptage des vulns
     {
         echo "┌─ EXECUTIVE SUMMARY ────────────────────────────────────────────────────────┐"
         
-        # Comptage sécurisé des vulnérabilités
+        # Comptage des vulns - chaque fichier vérifié séparément
         local critical=0
         local high=0
         local medium=0
         local low=0
         
-        # Critical vulnerabilities
+        # Vulns critiques trouvées
         if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
             local count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
             critical=$((critical + count))
@@ -1289,7 +1291,7 @@ REPORT_HEADER_END
             critical=$((critical + count))
         fi
         
-        # High risk issues
+        # Problèmes à risque élevé
         if [ -f "$OUTDIR/web/nuclei.txt" ]; then
             local count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
             high=$((high + count))
@@ -1299,7 +1301,7 @@ REPORT_HEADER_END
             high=$((high + count))
         fi
         
-        # Medium risk issues
+        # Risques moyens
         if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
             local count=$(grep -ci "medium\|warning" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
             medium=$((medium + count))
@@ -1309,30 +1311,30 @@ REPORT_HEADER_END
             medium=$((medium + count))
         fi
         
-        # Low risk items (open ports)
+        # Items à faible risque (ports ouverts basiques)
         if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
             low=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
         fi
         
-        # Affichage des résultats
+        # On affiche tout ça
         echo "│ Critical Vulnerabilities: $critical"
         echo "│ High Risk Issues: $high"
         echo "│ Medium Risk Issues: $medium"
         echo "│ Low Risk Items: $low"
         
-        # Open ports
+        # Nombre de ports ouverts
         if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
             local ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
             echo "│ Open Ports: $ports"
         fi
         
-        # Subdomains
+        # Nombre de subdomains trouvés
         if [ -f "$OUTDIR/osint/all_subdomains.txt" ]; then
             local subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
             echo "│ Subdomains: $subs"
         fi
         
-        # Risk calculation
+        # Calcul du score de risque sur 100
         local risk=$((critical * 10 + high * 5 + medium * 2 + low * 1))
         [ $risk -gt 100 ] && risk=100
         
