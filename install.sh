@@ -31,7 +31,7 @@ EOF
     echo -e "${NC}"
     echo "================================================================"
     echo -e "${WHITE}                      INSTALLATION SCRIPT${NC}"
-    echo -e "${CYAN}                         Version 2.3.0${NC}"
+    echo -e "${CYAN}                         Version 2.3.1${NC}"
     echo "================================================================"
     echo
 }
@@ -120,12 +120,6 @@ install_tools() {
             }
         fi
         
-        if ! command -v amass &> /dev/null; then
-            echo -e "${CYAN}[INFO]${NC} Installing amass..."
-            go install -v github.com/owasp-amass/amass/v4/...@master 2>/dev/null || {
-                echo -e "${YELLOW}[WARNING]${NC} Amass installation failed"
-            }
-        fi
         
         if ! command -v assetfinder &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing assetfinder..."
@@ -165,7 +159,7 @@ install_tools() {
             }
         fi
     else
-        echo -e "${YELLOW}[WARNING]${NC} Go not found. Some tools (subfinder, nuclei, amass, assetfinder, findomain) will not be installed."
+        echo -e "${YELLOW}[WARNING]${NC} Go not found. Some tools (subfinder, nuclei, assetfinder, findomain) will not be installed."
         echo -e "${CYAN}[TIP]${NC} Install Go with: sudo apt install golang-go"
     fi
     

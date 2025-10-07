@@ -86,10 +86,10 @@ remove_desktop_entry() {
 remove_go_tools() {
     echo -e "${CYAN}[INFO]${NC} Checking for Go-based security tools..."
     
-    local go_tools=("subfinder" "nuclei" "amass" "assetfinder")
+    local go_tools=("subfinder" "nuclei" "assetfinder" "findomain")
     local removed_tools=()
     
-    read -rp "Remove Go-based security tools (subfinder, nuclei, amass)? [y/N]: " remove_go
+    read -rp "Remove Go-based security tools (subfinder, nuclei, assetfinder, findomain)? [y/N]: " remove_go
     
     if [[ "$remove_go" =~ ^[Yy]$ ]]; then
         if command -v go &> /dev/null; then

@@ -4,14 +4,14 @@
 
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.3.0-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.3.1-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux-blue?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-**Security Scanner v2.3.0**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
+**Security Scanner v2.3.1**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
 
-## What's New in v2.3.0
+## What's New in v2.3.1
 
 ### Major Performance Improvements
 
@@ -74,7 +74,7 @@ security -s
 
 ## Performance Comparison
 
-| Operation | v2.2.1 | v2.3.0 | Improvement |
+| Operation | v2.2.1 | v2.3.1 | Improvement |
 |-----------|--------|--------|-------------|
 | Full assessment | ~60 min | ~20 min | **67% faster** |
 | Port scanning | 10 min | 5 min | **50% faster** |
@@ -94,7 +94,7 @@ nmap masscan
 gobuster nikto whatweb sqlmap
 
 # OSINT tools
-whois subfinder amass theHarvester
+whois subfinder theHarvester
 
 # Vulnerability scanners
 nuclei
@@ -119,7 +119,7 @@ pip3 install theHarvester
 
 ### 1. OSINT & Information Gathering
 
-- **Fast subdomain enumeration** (Subfinder, Amass, Assetfinder)
+- **Fast subdomain enumeration** (Subfinder, Assetfinder, Findomain)
 - **Email harvesting** (theHarvester)
 - **Certificate transparency** (crt.sh)
 - **DNS enumeration** (dig)
@@ -161,7 +161,6 @@ redteam_20250106_143022/
 │   ├── whois.txt
 │   ├── dns.txt
 │   ├── subdomains_subfinder.txt
-│   ├── subdomains_amass.txt
 │   ├── all_subdomains.txt          # Consolidated
 │   ├── emails.txt
 │   ├── crt_sh.txt
@@ -465,7 +464,7 @@ Active Users: Growing
 ---
 
 <p align="center">
-  <strong>Security Scanner v2.3.0</strong><br>
+  <strong>Security Scanner v2.3.1</strong><br>
   Professional Red Team Assessment Tool<br>
   Fast • Reliable • Comprehensive
 </p>

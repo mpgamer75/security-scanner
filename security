@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# Security Scanner v2.3.0 - Red Team Tool
+# Security Scanner v2.3.1 - Red Team Tool
 # =============================================================================
 # Un outil complet pour les tests d'intrusion et red team ops
 # Contient tout ce qu'il faut: OSINT, scan réseau, tests web, exploitation
@@ -27,7 +27,7 @@ DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-VERSION="2.3.0"
+VERSION="2.3.1"
 
 # Vars globales du script
 SCAN_INTERRUPTED=false
@@ -91,7 +91,7 @@ OPTIONS:
 SCAN TYPES:
     1. OSINT & Information Gathering
        - WHOIS, DNS enumeration, reverse DNS
-       - Subdomain enumeration (Subfinder, Amass, Assetfinder, Findomain)
+       - Subdomain enumeration (Subfinder, Assetfinder, Findomain)
        - Email harvesting (theHarvester)
        - Certificate transparency (crt.sh)
        - Google dorking (automated queries)
@@ -308,13 +308,6 @@ run_osint_scans() {
                 $TIMEOUT_MEDIUM "$OUTDIR/osint/subdomains_subfinder.txt"
         fi
         
-        if command -v amass &> /dev/null && [ "$QUICK_MODE" != true ]; then
-            local amass_timeout=$TIMEOUT_LONG
-            [ "$AGGRESSIVE_MODE" = true ] && amass_timeout=$TIMEOUT_VERY_LONG
-            execute_scan "Amass Enumeration" \
-                "timeout $amass_timeout amass enum -passive -d '$domain' -max-dns-queries 100 -max-depth 2 -silent 2>/dev/null | head -1000 || echo 'Amass failed'" \
-                $amass_timeout "$OUTDIR/osint/subdomains_amass.txt"
-        fi
         
         if command -v assetfinder &> /dev/null; then
             execute_scan "Assetfinder Discovery" \
