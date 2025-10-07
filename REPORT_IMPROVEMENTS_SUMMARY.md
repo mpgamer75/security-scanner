@@ -234,3 +234,4 @@ Le système peut maintenant diagnostiquer automatiquement :
 **Version** : 2.2.1  
 **Statut** : Système de rapport robuste et diagnostique automatique
 
+

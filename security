@@ -1239,12 +1239,18 @@ generate_report() {
     
     mkdir -p "$OUTDIR/reports"
     
+    # CORRECTION: On enleve errexit pour éviter les interruptions
     set +e
     
+    # Génére le rapport en plusieurs étapes pour éviter les troncatures
+    cat > "$report" << 'REPORT_HEADER_END'
+╔════════════════════════════════════════════════════════════════════════════╗
+║                     RED TEAM ASSESSMENT REPORT                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+REPORT_HEADER_END
+    
+    # Section: Target Information
     {
-        echo "╔════════════════════════════════════════════════════════════════════════════╗"
-        echo "║                     RED TEAM ASSESSMENT REPORT                            ║"
-        echo "╚════════════════════════════════════════════════════════════════════════════╝"
         echo
         echo "┌─ TARGET INFORMATION ───────────────────────────────────────────────────────┐"
         echo "│ Target: $TARGET"
@@ -1257,47 +1263,76 @@ generate_report() {
         [ "$AGGRESSIVE_MODE" = true ] && echo "│ Scan Mode: Aggressive (full coverage)"
         echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
-        
+    } >> "$report" 2>/dev/null
+    
+    # Section: Executive Summary (comptage sécurisé)
+    {
         echo "┌─ EXECUTIVE SUMMARY ────────────────────────────────────────────────────────┐"
         
-        # Count findings
-        local critical=0 high=0 medium=0 low=0
+        # Comptage sécurisé des vulnérabilités
+        local critical=0
+        local high=0
+        local medium=0
+        local low=0
         
-        for file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/network/nmap_critical_vulns.txt" \
-                    "$OUTDIR/network/smb_enum.txt"; do
-            [ -f "$file" ] && critical=$((critical + $(grep -ci "VULNERABLE\|CRITICAL\|ms17-010\|EternalBlue" "$file" 2>/dev/null | grep -v "NOT VULNERABLE" || echo 0)))
-        done
+        # Critical vulnerabilities
+        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+            local count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+            critical=$((critical + count))
+        fi
+        if [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ]; then
+            local count=$(grep -ci "CRITICAL\|ms17-010\|EternalBlue" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null || echo 0)
+            critical=$((critical + count))
+        fi
+        if [ -f "$OUTDIR/network/smb_enum.txt" ]; then
+            local count=$(grep -ci "VULNERABLE" "$OUTDIR/network/smb_enum.txt" 2>/dev/null || echo 0)
+            critical=$((critical + count))
+        fi
         
-        for file in "$OUTDIR/web/nuclei.txt" "$OUTDIR/web/nikto.txt"; do
-            [ -f "$file" ] && high=$((high + $(grep -ci "high\|critical" "$file" 2>/dev/null || echo 0)))
-        done
+        # High risk issues
+        if [ -f "$OUTDIR/web/nuclei.txt" ]; then
+            local count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
+            high=$((high + count))
+        fi
+        if [ -f "$OUTDIR/web/nikto.txt" ]; then
+            local count=$(grep -ci "high" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
+            high=$((high + count))
+        fi
         
-        for file in "$OUTDIR/network/nmap_vulns.txt" "$OUTDIR/web/nikto.txt"; do
-            [ -f "$file" ] && medium=$((medium + $(grep -ci "medium\|warning" "$file" 2>/dev/null || echo 0)))
-        done
+        # Medium risk issues
+        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+            local count=$(grep -ci "medium\|warning" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+            medium=$((medium + count))
+        fi
+        if [ -f "$OUTDIR/web/nikto.txt" ]; then
+            local count=$(grep -ci "medium\|warning" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
+            medium=$((medium + count))
+        fi
         
-        [ -f "$OUTDIR/network/nmap_ports.txt" ] && low=$(($(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)))
+        # Low risk items (open ports)
+        if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
+            low=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
+        fi
         
-        critical=${critical:-0}
-        high=${high:-0}
-        medium=${medium:-0}
-        low=${low:-0}
-        
+        # Affichage des résultats
         echo "│ Critical Vulnerabilities: $critical"
         echo "│ High Risk Issues: $high"
         echo "│ Medium Risk Issues: $medium"
         echo "│ Low Risk Items: $low"
         
+        # Open ports
         if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
             local ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
             echo "│ Open Ports: $ports"
         fi
         
+        # Subdomains
         if [ -f "$OUTDIR/osint/all_subdomains.txt" ]; then
             local subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
             echo "│ Subdomains: $subs"
         fi
         
+        # Risk calculation
         local risk=$((critical * 10 + high * 5 + medium * 2 + low * 1))
         [ $risk -gt 100 ] && risk=100
         
@@ -1315,7 +1350,45 @@ generate_report() {
         
         echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
-        
+    } >> "$report" 2>/dev/null
+    
+    # Section: Detailed Findings
+    {
+        echo "┌─ DETAILED FINDINGS ────────────────────────────────────────────────────────┐"
+        echo "│"
+        echo "│ === Network Vulnerabilities ==="
+        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+            grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | while read line; do
+                echo "│ - $line"
+            done || echo "│ - No network vulnerabilities detected"
+        else
+            echo "│ - No network scan performed"
+        fi
+        echo "│"
+        echo "│ === Web Vulnerabilities ==="
+        if [ -f "$OUTDIR/web/nuclei.txt" ]; then
+            head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | while read line; do
+                echo "│ - $line"
+            done || echo "│ - No web vulnerabilities detected"
+        else
+            echo "│ - No web scan performed"
+        fi
+        echo "│"
+        echo "│ === Open Services ==="
+        if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
+            grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | while read line; do
+                echo "│ - $line"
+            done || echo "│ - No services detected"
+        else
+            echo "│ - No service scan performed"
+        fi
+        echo "│"
+        echo "└────────────────────────────────────────────────────────────────────────────┘"
+        echo
+    } >> "$report" 2>/dev/null
+    
+    # Section: Recommendations
+    {
         echo "┌─ RECOMMENDATIONS ──────────────────────────────────────────────────────────┐"
         echo "│ Immediate Actions:"
         echo "│   1. Patch all critical vulnerabilities"
@@ -1331,32 +1404,53 @@ generate_report() {
         echo "│   4. Execute Metasploit modules"
         echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
-        
+    } >> "$report" 2>/dev/null
+    
+    # Section: Output Files
+    {
         echo "┌─ OUTPUT FILES ─────────────────────────────────────────────────────────────┐"
         echo "│ Location: $OUTDIR"
         echo "│ Reports: $OUTDIR/reports/"
         echo "│ Exploits: $OUTDIR/exploit/"
+        echo "│"
+        echo "│ Generated files:"
+        find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | while read file; do
+            local size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            local name=$(basename "$file")
+            echo "│   - $name ($(echo "$size" | awk '{printf "%.1fKB", $1/1024}'))"
+        done || echo "│   - Error listing files"
         echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
+    } >> "$report" 2>/dev/null
+    
+    # Footer
+    {
         echo "╔════════════════════════════════════════════════════════════════════════════╗"
         echo "║         Security Scanner v$VERSION - Assessment Complete                  ║"
         echo "╚════════════════════════════════════════════════════════════════════════════╝"
-        
-    } > "$report" 2>/dev/null
+        echo
+        echo "REPORT GENERATED: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "END OF REPORT"
+    } >> "$report" 2>/dev/null
     
     set -e
     
+    # Vérification du rapport
     if [ -f "$report" ] && [ -s "$report" ]; then
-        local lines=$(wc -l < "$report")
-        echo -e "${GREEN}[SUCCESS]${NC} Report: ${WHITE}$report${NC} ${DIM}($lines lines)${NC}"
+        local lines=$(wc -l < "$report" 2>/dev/null || echo 0)
+        local size=$(stat -c%s "$report" 2>/dev/null || echo 0)
+        echo -e "${GREEN}[SUCCESS]${NC} Report: ${WHITE}$report${NC} ${DIM}($lines lines, $size bytes)${NC}"
         generate_json_report
         return 0
     else
-        echo -e "${RED}[ERROR]${NC} Report failed"
+        echo -e "${RED}[ERROR]${NC} Report generation failed"
         {
-            echo "BACKUP REPORT"
+            echo "BACKUP REPORT - $(date '+%Y-%m-%d %H:%M:%S')"
             echo "Target: $TARGET"
-            echo "Date: $(date)"
+            echo "URL: $URL"
+            echo "Domain: $DOMAIN"
+            echo
+            echo "Generated files:"
             find "$OUTDIR" -name "*.txt" -type f 2>/dev/null
         } > "$OUTDIR/reports/backup_report.txt"
         return 1

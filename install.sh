@@ -31,7 +31,7 @@ EOF
     echo -e "${NC}"
     echo "================================================================"
     echo -e "${WHITE}                      INSTALLATION SCRIPT${NC}"
-    echo -e "${CYAN}                         Version 2.0.0${NC}"
+    echo -e "${CYAN}                         Version 2.3.0${NC}"
     echo "================================================================"
     echo
 }
@@ -59,7 +59,8 @@ check_system() {
 install_tools() {
     echo -e "${CYAN}[INFO]${NC} Checking required tools..."
     
-    local tools=(nmap masscan gobuster sqlmap whois nikto whatweb dig openssl curl wget git python3-pip)
+    # MISE À JOUR: Liste complète des outils utilisés dans le scanner v2.3.0
+    local tools=(nmap masscan gobuster sqlmap whois nikto whatweb dig openssl curl wget git python3-pip nc netcat enum4linux smbclient sslscan hydra)
     local missing=()
     
     for tool in "${tools[@]}"; do
@@ -85,13 +86,20 @@ install_tools() {
     
     if command -v apt &> /dev/null; then
         sudo apt update
-        sudo apt install -y "${missing[@]}"
+        # Installation des outils système
+        sudo apt install -y nmap masscan gobuster sqlmap whois nikto whatweb dnsutils openssl curl wget git python3-pip netcat-traditional enum4linux smbclient sslscan hydra 2>/dev/null || {
+            echo -e "${YELLOW}[WARNING]${NC} Some packages may not be available, continuing..."
+        }
         
     elif command -v yum &> /dev/null; then
-        sudo yum install -y "${missing[@]}"
+        sudo yum install -y nmap masscan gobuster sqlmap whois nikto whatweb bind-utils openssl curl wget git python3-pip nc enum4linux smbclient sslscan hydra 2>/dev/null || {
+            echo -e "${YELLOW}[WARNING]${NC} Some packages may not be available, continuing..."
+        }
         
     elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm "${missing[@]}"
+        sudo pacman -S --noconfirm nmap masscan gobuster sqlmap whois nikto whatweb bind-tools openssl curl wget git python-pip gnu-netcat smbclient hydra 2>/dev/null || {
+            echo -e "${YELLOW}[WARNING]${NC} Some packages may not be available, continuing..."
+        }
     fi
     
     # Install Go tools if Go is available
@@ -100,20 +108,65 @@ install_tools() {
         
         if ! command -v subfinder &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing subfinder..."
-            go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+            go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest 2>/dev/null || {
+                echo -e "${YELLOW}[WARNING]${NC} Subfinder installation failed"
+            }
         fi
         
         if ! command -v nuclei &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing nuclei..."
-            go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
+            go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest 2>/dev/null || {
+                echo -e "${YELLOW}[WARNING]${NC} Nuclei installation failed"
+            }
         fi
         
         if ! command -v amass &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing amass..."
-            go install -v github.com/OWASP/Amass/v3/...@master
+            go install -v github.com/owasp-amass/amass/v4/...@master 2>/dev/null || {
+                echo -e "${YELLOW}[WARNING]${NC} Amass installation failed"
+            }
+        fi
+        
+        if ! command -v assetfinder &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing assetfinder..."
+            go install -v github.com/tomnomnom/assetfinder@latest 2>/dev/null || {
+                echo -e "${YELLOW}[WARNING]${NC} Assetfinder installation failed"
+            }
+        fi
+        
+        if ! command -v findomain &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing findomain..."
+            # Findomain nécessite une installation différente
+            wget -q https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux -O /tmp/findomain 2>/dev/null && {
+                sudo mv /tmp/findomain /usr/local/bin/findomain
+                sudo chmod +x /usr/local/bin/findomain
+                echo -e "${GREEN}[OK]${NC} Findomain installed"
+            } || {
+                echo -e "${YELLOW}[WARNING]${NC} Findomain installation failed"
+            }
+        fi
+        
+        if ! command -v rustscan &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing rustscan..."
+            # RustScan installation via cargo ou binaire
+            if command -v cargo &> /dev/null; then
+                cargo install rustscan 2>/dev/null || {
+                    echo -e "${YELLOW}[WARNING]${NC} RustScan installation failed"
+                }
+            else
+                echo -e "${YELLOW}[INFO]${NC} Cargo not found, skipping RustScan"
+            fi
+        fi
+        
+        if ! command -v wafw00f &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing wafw00f..."
+            go install -v github.com/EnableSecurity/wafw00f@latest 2>/dev/null || {
+                echo -e "${YELLOW}[WARNING]${NC} wafw00f installation failed"
+            }
         fi
     else
-        echo -e "${YELLOW}[WARNING]${NC} Go not found. Some tools (subfinder, nuclei, amass) will not be installed."
+        echo -e "${YELLOW}[WARNING]${NC} Go not found. Some tools (subfinder, nuclei, amass, assetfinder, findomain) will not be installed."
+        echo -e "${CYAN}[TIP]${NC} Install Go with: sudo apt install golang-go"
     fi
     
     # Install Python tools
@@ -123,13 +176,25 @@ install_tools() {
         # Install theHarvester
         if ! command -v theHarvester &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing theHarvester..."
-            pip3 install theHarvester --break-system-packages 2>/dev/null || pip3 install theHarvester
+            pip3 install theHarvester --break-system-packages 2>/dev/null || pip3 install theHarvester || {
+                echo -e "${YELLOW}[WARNING]${NC} theHarvester installation failed"
+            }
         fi
         
-        # Install other useful Python tools
+        # Install Shodan CLI
         if ! command -v shodan &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing Shodan CLI..."
-            pip3 install shodan --break-system-packages 2>/dev/null || pip3 install shodan
+            pip3 install shodan --break-system-packages 2>/dev/null || pip3 install shodan || {
+                echo -e "${YELLOW}[WARNING]${NC} Shodan CLI installation failed"
+            }
+        fi
+        
+        # Install wafw00f (Python version)
+        if ! command -v wafw00f &> /dev/null; then
+            echo -e "${CYAN}[INFO]${NC} Installing wafw00f..."
+            pip3 install wafw00f --break-system-packages 2>/dev/null || pip3 install wafw00f || {
+                echo -e "${YELLOW}[WARNING]${NC} wafw00f installation failed"
+            }
         fi
     else
         echo -e "${YELLOW}[WARNING]${NC} pip3 not found. Some Python tools will not be installed."
