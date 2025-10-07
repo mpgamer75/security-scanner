@@ -1358,27 +1358,36 @@ REPORT_HEADER_END
         echo "│"
         echo "│ === Network Vulnerabilities ==="
         if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-            grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | while read line; do
-                echo "│ - $line"
-            done || echo "│ - No network vulnerabilities detected"
+            local vuln_count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+            if [ "$vuln_count" -gt 0 ]; then
+                grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | sed 's/^/│ - /'
+            else
+                echo "│ - No network vulnerabilities detected"
+            fi
         else
             echo "│ - No network scan performed"
         fi
         echo "│"
         echo "│ === Web Vulnerabilities ==="
         if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-            head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | while read line; do
-                echo "│ - $line"
-            done || echo "│ - No web vulnerabilities detected"
+            local web_vuln_lines=$(wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
+            if [ "$web_vuln_lines" -gt 0 ]; then
+                head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | sed 's/^/│ - /'
+            else
+                echo "│ - No web vulnerabilities detected"
+            fi
         else
             echo "│ - No web scan performed"
         fi
         echo "│"
         echo "│ === Open Services ==="
         if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
-            grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | while read line; do
-                echo "│ - $line"
-            done || echo "│ - No services detected"
+            local service_count=$(grep -c "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null || echo 0)
+            if [ "$service_count" -gt 0 ]; then
+                grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | sed 's/^/│ - /'
+            else
+                echo "│ - No services detected"
+            fi
         else
             echo "│ - No service scan performed"
         fi
@@ -1414,11 +1423,12 @@ REPORT_HEADER_END
         echo "│ Exploits: $OUTDIR/exploit/"
         echo "│"
         echo "│ Generated files:"
-        find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | while read file; do
-            local size=$(stat -c%s "$file" 2>/dev/null || echo 0)
-            local name=$(basename "$file")
-            echo "│   - $name ($(echo "$size" | awk '{printf "%.1fKB", $1/1024}'))"
-        done || echo "│   - Error listing files"
+        local file_count=$(find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | wc -l)
+        if [ "$file_count" -gt 0 ]; then
+            find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | xargs -I {} basename {} | sed 's/^/│   - /'
+        else
+            echo "│   - No files generated yet"
+        fi
         echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
     } >> "$report" 2>/dev/null
