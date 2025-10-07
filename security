@@ -310,7 +310,7 @@ run_osint_scans() {
             local amass_timeout=$TIMEOUT_LONG
             [ "$AGGRESSIVE_MODE" = true ] && amass_timeout=$TIMEOUT_VERY_LONG
             execute_scan "Amass Enumeration" \
-                "timeout $amass_timeout amass enum -passive -d '$domain' -silent 2>/dev/null | head -1000 || echo 'Amass failed'" \
+                "timeout $amass_timeout amass enum -passive -d '$domain' -max-dns-queries 100 -max-depth 2 -silent 2>/dev/null | head -1000 || echo 'Amass failed'" \
                 $amass_timeout "$OUTDIR/osint/subdomains_amass.txt"
         fi
         
