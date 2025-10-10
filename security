@@ -27,7 +27,7 @@ DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-VERSION="2.3.1"
+VERSION="2.3.2"
 
 # Vars globales du script
 SCAN_INTERRUPTED=false
@@ -73,17 +73,15 @@ EOF
     echo -e "${ORANGE}Version:${NC} ${YELLOW}${VERSION}${NC} ${GRAY}|${NC} ${ORANGE}Author:${NC} ${WHITE}mpgamer75${NC} ${GRAY}|${NC} ${ORANGE}Status:${NC} ${GREEN}COMPLETE & OPTIMIZED${NC}"
     echo -e "${DIM}${GRAY}Professional Penetration Testing & Red Team Operations${NC}"
     echo
-    echo -e "${YELLOW}╔════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║${NC} ${RED}⚠ LEGAL DISCLAIMER ⚠${NC}                                                       ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}                                                                            ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC} This tool is intended for AUTHORIZED penetration testing ONLY.            ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC} Any use on systems without prior written permission is ILLEGAL and        ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC} could earn you an extended stay at a facility with complimentary          ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC} iron bars as room decor. 🏢🔒                                               ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC}                                                                            ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC} The author disclaims all responsibility for misuse of this tool.          ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${NC} \"With great power comes great... legal paperwork.\" - Uncle Ben, probably ${YELLOW}║${NC}"
-    echo -e "${YELLOW}╚════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${YELLOW}=================================================================================${NC}"
+    echo -e "${RED}[!] LEGAL DISCLAIMER [!]${NC}"
+    echo -e "${YELLOW}=================================================================================${NC}"
+    echo -e "${GRAY}This tool is intended for ${WHITE}AUTHORIZED${GRAY} penetration testing ${WHITE}ONLY${GRAY}.${NC}"
+    echo -e "${GRAY}Any use on systems without prior written permission is ${RED}ILLEGAL${GRAY}.${NC}"
+    echo
+    echo -e "${DIM}The author disclaims all responsibility for misuse of this tool.${NC}"
+    echo -e "${DIM}With great power comes great... legal paperwork.${NC}"
+    echo -e "${YELLOW}=================================================================================${NC}"
     echo
 }
 
@@ -441,46 +439,7 @@ cat $OUTDIR/osint/google_dorks.txt" \
              head -200 || echo 'Wayback Machine lookup failed'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/wayback_urls.txt"
         
-        # Liste des profils sociaux à checker manuellement
-        execute_scan "Social Media Reconnaissance" \
-            "cat > $OUTDIR/osint/social_media.txt << 'SOCIAL_END'
-=== SOCIAL MEDIA PROFILES TO CHECK ===
-
-LinkedIn:
-  - https://www.linkedin.com/company/$domain
-  - https://www.linkedin.com/search/results/all/?keywords=$domain
-
-Twitter/X:
-  - https://twitter.com/search?q=$domain
-
-Facebook:
-  - https://www.facebook.com/search/top?q=$domain
-
-Instagram:
-  - https://www.instagram.com/explore/tags/$domain
-
-YouTube:
-  - https://www.youtube.com/results?search_query=$domain
-
-GitHub:
-  - https://github.com/search?q=$domain
-
-Reddit:
-  - https://www.reddit.com/search/?q=$domain
-
-=== BREACH DATA SOURCES ===
-
-HaveIBeenPwned:
-  - https://haveibeenpwned.com/
-
-DeHashed:
-  - https://dehashed.com/
-
-IntelligenceX:
-  - https://intelx.io/
-SOCIAL_END
-cat $OUTDIR/osint/social_media.txt" \
-            $TIMEOUT_VERY_SHORT "$OUTDIR/osint/social_media.txt"
+        # Social media reconnaissance removed - manual OSINT recommended for targeted campaigns
     fi
     
     if [ -n "$target" ]; then
@@ -506,27 +465,27 @@ run_network_scans() {
     echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
     echo
     
-    # Config des paramètres nmap selon le mode choisi
+    # Config des paramètres nmap selon le mode choisi - optimisé pour efficacité maximale
     local nmap_timing="-T4"
-    local port_range="--top-ports 1000"
-    local max_retries="--max-retries 1"
-    local min_rate="--min-rate 1000"
+    local port_range="--top-ports 2000"  # Augmenté de 1000 à 2000
+    local max_retries="--max-retries 2"  # Augmenté de 1 à 2 pour meilleure détection
+    local min_rate="--min-rate 2000"     # Augmenté de 1000 à 2000
     
     if [ "$QUICK_MODE" = true ]; then
         nmap_timing="-T5"
-        port_range="--top-ports 500"
-        max_retries="--max-retries 0"
-        min_rate="--min-rate 3000"
-    elif [ "$STEALTH_MODE" = true ]; then
-        nmap_timing="-T2"
         port_range="--top-ports 1000"
-        max_retries="--max-retries 2"
-        min_rate=""
-    elif [ "$AGGRESSIVE_MODE" = true ]; then
-        nmap_timing="-T5"
-        port_range="-p-"
         max_retries="--max-retries 1"
         min_rate="--min-rate 5000"
+    elif [ "$STEALTH_MODE" = true ]; then
+        nmap_timing="-T2"
+        port_range="--top-ports 1500"
+        max_retries="--max-retries 3"
+        min_rate="--min-rate 500"
+    elif [ "$AGGRESSIVE_MODE" = true ]; then
+        nmap_timing="-T5"
+        port_range="-p-"  # Tous les ports
+        max_retries="--max-retries 2"
+        min_rate="--min-rate 10000"  # Très rapide
     fi
     
     # Découverte des hosts - on force -Pn pour éviter les blocages
@@ -554,13 +513,13 @@ run_network_scans() {
          --host-timeout 5m --defeat-rst-ratelimit '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_ports.txt" true
     
-    # Détection des services et versions qui tournent
+    # Détection des services et versions qui tournent - version intensity augmentée
     local service_timeout=$TIMEOUT_LONG
     [ "$QUICK_MODE" = true ] && service_timeout=$TIMEOUT_MEDIUM
     
     execute_scan "Service Version Detection" \
-        "nmap -Pn -sV -sC $nmap_timing --top-ports 500 --version-intensity 5 \
-         $max_retries --host-timeout 10m '$target' 2>/dev/null" \
+        "nmap -Pn -sV -sC $nmap_timing --top-ports 1000 --version-intensity 7 \
+         --version-all $max_retries --host-timeout 15m '$target' 2>/dev/null" \
         $service_timeout "$OUTDIR/network/nmap_services.txt"
     
     # Scan UDP sur les ports critiques uniquement (c'est lent l'UDP)
@@ -577,16 +536,16 @@ run_network_scans() {
          nmap -Pn -O --osscan-guess --max-os-tries 1 --host-timeout 3m '$target' 2>/dev/null" \
         $TIMEOUT_MEDIUM "$OUTDIR/network/nmap_os.txt"
     
-    # Scan de vulns avec les scripts NSE
+    # Scan de vulns avec les scripts NSE - coverage étendu
     execute_scan "Vulnerability Detection (NSE)" \
-        "nmap -Pn -sV --script 'vuln and not dos and not intrusive' --script-timeout 90s \
-         --top-ports 500 $max_retries --host-timeout 10m '$target' 2>/dev/null" \
+        "nmap -Pn -sV --script 'vuln and not dos' --script-timeout 120s \
+         --top-ports 1000 $max_retries --host-timeout 15m '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_vulns.txt"
     
-    # Scripts NSE pour les vulns critiques (SMB, SSL, HTTP)
+    # Scripts NSE pour les vulns critiques (SMB, SSL, HTTP, FTP, SSH)
     execute_scan "Critical Vulnerability Scan" \
-        "nmap -Pn --script 'smb-vuln-*,ssl-*,http-vuln-*' --script-timeout 60s \
-         --script-args unsafe=1 --host-timeout 8m '$target' 2>/dev/null" \
+        "nmap -Pn --script 'smb-vuln-*,ssl-*,http-vuln-*,ftp-vuln-*,ssh-*' --script-timeout 90s \
+         --script-args unsafe=1 --host-timeout 12m '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_critical_vulns.txt"
     
     # Enum SMB complète - j'ai enfin réussi à fix les bugs

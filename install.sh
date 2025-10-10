@@ -31,7 +31,7 @@ EOF
     echo -e "${NC}"
     echo "================================================================"
     echo -e "${WHITE}                      INSTALLATION SCRIPT${NC}"
-    echo -e "${CYAN}                         Version 2.3.1${NC}"
+    echo -e "${CYAN}                         Version 2.3.2${NC}"
     echo "================================================================"
     echo
 }
@@ -167,21 +167,8 @@ install_tools() {
     echo -e "${CYAN}[INFO]${NC} Installing Python-based tools..."
     
     if command -v pip3 &> /dev/null; then
-        # Install theHarvester
-        if ! command -v theHarvester &> /dev/null; then
-            echo -e "${CYAN}[INFO]${NC} Installing theHarvester..."
-            pip3 install theHarvester --break-system-packages 2>/dev/null || pip3 install theHarvester || {
-                echo -e "${YELLOW}[WARNING]${NC} theHarvester installation failed"
-            }
-        fi
-        
-        # Install Shodan CLI
-        if ! command -v shodan &> /dev/null; then
-            echo -e "${CYAN}[INFO]${NC} Installing Shodan CLI..."
-            pip3 install shodan --break-system-packages 2>/dev/null || pip3 install shodan || {
-                echo -e "${YELLOW}[WARNING]${NC} Shodan CLI installation failed"
-            }
-        fi
+        # Note: theHarvester and Shodan removed from automatic installation (v2.3.2)
+        # theHarvester public sources are obsolete, Shodan requires paid API key
         
         # Install wafw00f (Python version)
         if ! command -v wafw00f &> /dev/null; then

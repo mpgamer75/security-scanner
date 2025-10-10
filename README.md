@@ -4,48 +4,67 @@
 
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.3.1-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.3.2-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux-blue?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-**Security Scanner v2.3.1**: Outil avancé d'évaluation red team. Conçu pour les pentesteurs professionnels et chercheurs en sécurité.
+**Security Scanner v2.3.2**: Outil avancé d'évaluation red team. Conçu pour les pentesteurs professionnels et chercheurs en sécurité.
 
-## Nouveautés v2.3.1
+## Nouveautés v2.3.2
 
-### Correctif Critique de Stabilité
+### Optimisations et Nettoyage
 
-- **Suppression d'AMASS** - L'outil causait des pertes de connexion Internet immédiates
-- **Stabilité réseau 100%** - Énumération de sous-domaines stable avec Subfinder, Assetfinder et Findomain
-- **19 outils supportés** - Couverture complète sans compromis de stabilité
+- **Scans Nmap optimisés** - Coverage étendu avec --top-ports 2000, version-intensity 7
+- **Détection améliorée** - Scripts NSE élargis (FTP, SSH en plus de SMB, SSL, HTTP)
+- **Disclaimer légal** - Format rétro old-school sans emojis
+- **Modes automatiques** - Les options -q, -s, -a lancent directement le scan complet
+- **OSINT allégé** - Retrait des outils obsolètes et social media (manuel recommandé)
+- **Rapports simplifiés** - Format ASCII pur pour compatibilité universelle
 
-### Améliorations Majeures de Performance
+### Outils Retirés (Obsolètes/Non Fiables)
 
-- **67% plus rapide** - Évaluation complète en environ 20min (était environ 60min)
-- **Anti-blocage** - `-Pn` forcé sur tous les scans Nmap
-- **Génération de rapports 100%** - Validation robuste avec sauvegarde automatique
-- **Exécution parallèle** - Plusieurs outils s'exécutent simultanément
-- **Timeouts intelligents** - Gestion adaptative des délais
+- **theHarvester** - Sources publiques obsolètes (utiliser hunter.io)
+- **Shodan** - Nécessite API key payante
+- **SQLMap automatique** - Trop invasif (utilisation manuelle recommandée)
+- **Social Media OSINT** - Meilleur en manuel pour ciblage précis
 
-### Nouvelles Fonctionnalités
+### Améliorations Techniques
 
-- **Mode Rapide** (`-q`) - Reconnaissance 3x plus rapide
-- **Mode Agressif** (`-a`) - Scan complet de tous les ports
-- **Évasion améliorée** - Meilleures techniques de contournement IDS/IPS
-- **Rapports JSON** - Sortie lisible par machine pour l'automatisation
-- **Progression temps réel** - Indicateurs visuels pour tous les scans
+- **Anti-blocage renforcé** - Tous les scans avec -Pn forcé
+- **Timeouts étendus** - Meilleure détection sans sacrifier la vitesse
+- **Rapports robustes** - Format ASCII simple, aucun problème d'affichage
+- **Nikto corrigé** - Option -o ajoutée pour output propre
 
-## Installation Rapide
+## Installation
+
+### Installation Automatique (Recommandée)
 
 ```bash
-# Installation automatique (recommandée)
 curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/install.sh | bash
+```
 
-# Ou installation manuelle
+Cette commande unique va:
+- Télécharger le script
+- Installer toutes les dépendances
+- Configurer l'outil dans /usr/local/bin
+- Rendre la commande `security` disponible globalement
+
+### Installation Manuelle
+
+Si vous préférez installer manuellement:
+
+```bash
+# Cloner le repository
 git clone https://github.com/mpgamer75/security-scanner.git
 cd security-scanner
-chmod +x install.sh && ./install.sh
+
+# Exécuter le script d'installation
+chmod +x install.sh
+./install.sh
 ```
+
+L'installateur détecte automatiquement votre distribution et installe les paquets appropriés.
 
 ## Démarrage Rapide
 

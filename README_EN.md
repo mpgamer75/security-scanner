@@ -4,42 +4,67 @@
 
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.3.1-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.3.2-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux-blue?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-**Security Scanner v2.3.1**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
+**Security Scanner v2.3.2**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
 
-## What's New in v2.3.1
+## What's New in v2.3.2
 
-### Major Performance Improvements
+### Optimizations and Cleanup
 
-- **67% faster** - Complete assessment in approximately 20 minutes (was approximately 60 minutes)
-- **Anti-blocking** - Forced `-Pn` on all Nmap scans
-- **100% report generation** - Robust validation with automatic backup
-- **Parallel execution** - Multiple tools running simultaneously
-- **Smart timeouts** - Adaptive timeout management
+- **Optimized Nmap scans** - Extended coverage with --top-ports 2000, version-intensity 7
+- **Enhanced detection** - Expanded NSE scripts (FTP, SSH in addition to SMB, SSL, HTTP)
+- **Legal disclaimer** - Retro old-school format without emojis
+- **Automatic modes** - Options -q, -s, -a now directly launch full assessment
+- **Streamlined OSINT** - Removed obsolete tools and social media (manual recommended)
+- **Simplified reports** - Pure ASCII format for universal compatibility
 
-### New Features
+### Removed Tools (Obsolete/Unreliable)
 
-- **Quick Mode** (`-q`) - 3x faster reconnaissance
-- **Aggressive Mode** (`-a`) - Full port scan, all tests
-- **Enhanced evasion** - Better IDS/IPS bypass techniques
-- **JSON reports** - Machine-readable output for automation
-- **Real-time progress** - Visual indicators for all scans
+- **theHarvester** - Obsolete public sources (use hunter.io instead)
+- **Shodan** - Requires paid API key
+- **Automatic SQLMap** - Too invasive (manual use recommended)
+- **Social Media OSINT** - Better performed manually for precise targeting
 
-## Quick Install
+### Technical Improvements
+
+- **Enhanced anti-blocking** - All scans with forced -Pn
+- **Extended timeouts** - Better detection without sacrificing speed
+- **Robust reports** - Simple ASCII format, no display issues
+- **Nikto fixed** - Added -o option for clean output
+
+## Installation
+
+### Automatic Installation (Recommended)
 
 ```bash
-# Automatic installation (recommended)
 curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/install.sh | bash
+```
 
-# Or manual
+This single command will:
+- Download the script
+- Install all dependencies
+- Configure the tool in /usr/local/bin
+- Make the `security` command globally available
+
+### Manual Installation
+
+If you prefer to install manually:
+
+```bash
+# Clone the repository
 git clone https://github.com/mpgamer75/security-scanner.git
 cd security-scanner
-chmod +x install.sh && ./install.sh
+
+# Run the installation script
+chmod +x install.sh
+./install.sh
 ```
+
+The installer automatically detects your distribution and installs appropriate packages.
 
 ## Quick Start
 
