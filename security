@@ -73,6 +73,18 @@ EOF
     echo -e "${ORANGE}Version:${NC} ${YELLOW}${VERSION}${NC} ${GRAY}|${NC} ${ORANGE}Author:${NC} ${WHITE}mpgamer75${NC} ${GRAY}|${NC} ${ORANGE}Status:${NC} ${GREEN}COMPLETE & OPTIMIZED${NC}"
     echo -e "${DIM}${GRAY}Professional Penetration Testing & Red Team Operations${NC}"
     echo
+    echo -e "${YELLOW}╔════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${YELLOW}║${NC} ${RED}⚠ LEGAL DISCLAIMER ⚠${NC}                                                       ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}                                                                            ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC} This tool is intended for AUTHORIZED penetration testing ONLY.            ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC} Any use on systems without prior written permission is ILLEGAL and        ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC} could earn you an extended stay at a facility with complimentary          ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC} iron bars as room decor. 🏢🔒                                               ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC}                                                                            ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC} The author disclaims all responsibility for misuse of this tool.          ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${NC} \"With great power comes great... legal paperwork.\" - Uncle Ben, probably ${YELLOW}║${NC}"
+    echo -e "${YELLOW}╚════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo
 }
 
 show_help() {
@@ -92,10 +104,8 @@ SCAN TYPES:
     1. OSINT & Information Gathering
        - WHOIS, DNS enumeration, reverse DNS
        - Subdomain enumeration (Subfinder, Assetfinder, Findomain)
-       - Email harvesting (theHarvester)
        - Certificate transparency (crt.sh)
        - Google dorking (automated queries)
-       - Shodan integration (optional)
        - Wayback Machine URLs
        - Social media reconnaissance
        - Geolocation & IP information
@@ -115,7 +125,6 @@ SCAN TYPES:
        - SSL/TLS analysis (comprehensive)
        - Directory enumeration (Gobuster, Dirb)
        - Vulnerability scanning (Nuclei, Nikto)
-       - SQL injection testing (SQLMap)
        - XSS payload testing (automated)
 
     4. Complete Red Team Assessment
@@ -338,18 +347,9 @@ run_osint_scans() {
              echo 'Certificate transparency lookup failed'" \
             $TIMEOUT_SHORT "$OUTDIR/osint/crt_sh.txt"
         
-        # Extraction d'emails avec theHarvester
-        if command -v theHarvester &> /dev/null; then
-            execute_scan "Email Harvesting (theHarvester)" \
-                "theHarvester -d '$domain' -l 200 -b google,bing,yahoo,duckduckgo,hunter 2>/dev/null || \
-                 echo 'theHarvester failed'" \
-            $TIMEOUT_LONG "$OUTDIR/osint/emails.txt"
-        elif command -v theharvester &> /dev/null; then
-            execute_scan "Email Harvesting (legacy)" \
-                "theharvester -d '$domain' -l 200 -b google,bing,yahoo 2>/dev/null || \
-                 echo 'theharvester failed'" \
-                $TIMEOUT_LONG "$OUTDIR/osint/emails_legacy.txt"
-        fi
+        # theHarvester retiré - les sources publiques ne fonctionnent plus de manière fiable
+        # Pour la collecte d'emails, utiliser des outils alternatifs comme hunter.io
+        echo -e "${YELLOW}[INFO]${NC} Email harvesting: Use hunter.io or alternative tools"
         
         # Génération des Google dorks - liste complète de requêtes
         execute_scan "Google Dork Generation" \
@@ -430,15 +430,9 @@ DORKS_END
 cat $OUTDIR/osint/google_dorks.txt" \
             $TIMEOUT_VERY_SHORT "$OUTDIR/osint/google_dorks.txt"
         
-        # Shodan search si l'outil est installé
-        if command -v shodan &> /dev/null; then
-            execute_scan "Shodan Search" \
-                "echo '=== Shodan Domain Search ===' && \
-                 timeout 90 shodan domain '$domain' 2>/dev/null || echo 'Shodan failed (API key required)' && \
-                 echo -e '\n=== Shodan Host Search ===' && \
-                 timeout 90 shodan search 'hostname:$domain' --limit 20 2>/dev/null || echo 'Shodan host search failed'" \
-                $TIMEOUT_MEDIUM "$OUTDIR/osint/shodan.txt"
-        fi
+        # Shodan retiré - nécessite une API key payante
+        # Pour utiliser Shodan, aller sur https://www.shodan.io/
+        echo -e "${YELLOW}[INFO]${NC} Shodan search: Requires API key - visit https://www.shodan.io/"
         
         # Récup des URLs archivées sur Wayback
         execute_scan "Wayback Machine URLs" \
@@ -752,33 +746,14 @@ run_web_scans() {
         [ "$AGGRESSIVE_MODE" = true ] && nikto_timeout=$TIMEOUT_VERY_LONG
         
         execute_scan "Nikto Web Vulnerability Scan" \
-            "nikto -h '$url' -C all -Format txt -Tuning x 2>/dev/null | head -300 || echo 'Nikto failed'" \
+            "nikto -h '$url' -C all -Format txt -o '$OUTDIR/web/nikto.txt' -Tuning x 2>&1 | head -300 || echo 'Nikto scan completed'" \
             $nikto_timeout "$OUTDIR/web/nikto.txt"
     fi
     
-    # Tests d'injection SQL avec sqlmap
-    if command -v sqlmap &> /dev/null; then
-        mkdir -p "$OUTDIR/web/sqlmap"
-        
-        local sqlmap_level=2
-        local sqlmap_risk=2
-        local sqlmap_timeout=$TIMEOUT_LONG
-        
-        if [ "$QUICK_MODE" = true ]; then
-            sqlmap_level=1
-            sqlmap_risk=1
-            sqlmap_timeout=$TIMEOUT_MEDIUM
-        elif [ "$AGGRESSIVE_MODE" = true ]; then
-            sqlmap_level=5
-            sqlmap_risk=3
-            sqlmap_timeout=$TIMEOUT_VERY_LONG
-        fi
-        
-        execute_scan "SQL Injection Testing (SQLMap)" \
-            "sqlmap -u '$url' --batch --level=$sqlmap_level --risk=$sqlmap_risk \
-             --output-dir='$OUTDIR/web/sqlmap' --threads=5 2>/dev/null | head -200 || echo 'SQLMap failed'" \
-            $sqlmap_timeout "$OUTDIR/web/sqlmap.log"
-    fi
+    # SQLMap retiré - nécessite une configuration spécifique et peut être invasif
+    # Pour les tests d'injection SQL, utiliser manuellement:
+    # sqlmap -u "URL?param=value" --batch --level=2 --risk=2
+    echo -e "${YELLOW}[INFO]${NC} SQL Injection: Test manually with SQLMap if needed"
     
     # Génération de payloads XSS pour les tests manuels
     execute_scan "XSS Payload Generation" \
@@ -1228,41 +1203,40 @@ cat $OUTDIR/exploit/persistence.sh" \
 }
 
 generate_report() {
-    local report="$OUTDIR/reports/executive_summary.txt"
+    local report="$OUTDIR/reports/summary_report.txt"
     
-    echo -e "\n${CYAN}[REPORT]${NC} Generating executive summary report..."
+    echo -e "\n${CYAN}[REPORT]${NC} Generating summary report..."
     
     mkdir -p "$OUTDIR/reports"
     
     # CORRECTION: On enleve errexit pour éviter les interruptions
     set +e
     
-    # Génére le rapport en plusieurs étapes pour éviter les troncatures
-    cat > "$report" << 'REPORT_HEADER_END'
-╔════════════════════════════════════════════════════════════════════════════╗
-║                     RED TEAM ASSESSMENT REPORT                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
+    # Génére le rapport avec un format simple et robuste
+    cat > "$report" << REPORT_HEADER_END
+================================================================================
+                     RED TEAM ASSESSMENT REPORT
+================================================================================
 REPORT_HEADER_END
     
     # Section infos sur la cible
     {
         echo
-        echo "┌─ TARGET INFORMATION ───────────────────────────────────────────────────────┐"
-        echo "│ Target: $TARGET"
-        [ -n "$URL" ] && echo "│ URL: $URL"
-        [ -n "$DOMAIN" ] && echo "│ Domain: $DOMAIN"
-        echo "│ Assessment Date: $(date '+%Y-%m-%d %H:%M:%S')"
-        echo "│ Scanner Version: Security Scanner v$VERSION"
-        [ "$QUICK_MODE" = true ] && echo "│ Scan Mode: Quick (3x faster)"
-        [ "$STEALTH_MODE" = true ] && echo "│ Scan Mode: Stealth (IDS/IPS evasion)"
-        [ "$AGGRESSIVE_MODE" = true ] && echo "│ Scan Mode: Aggressive (full coverage)"
-        echo "└────────────────────────────────────────────────────────────────────────────┘"
+        echo "--- TARGET INFORMATION ---"
+        echo "Target: $TARGET"
+        [ -n "$URL" ] && echo "URL: $URL"
+        [ -n "$DOMAIN" ] && echo "Domain: $DOMAIN"
+        echo "Assessment Date: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "Scanner Version: Security Scanner v$VERSION"
+        [ "$QUICK_MODE" = true ] && echo "Scan Mode: Quick (3x faster)"
+        [ "$STEALTH_MODE" = true ] && echo "Scan Mode: Stealth (IDS/IPS evasion)"
+        [ "$AGGRESSIVE_MODE" = true ] && echo "Scan Mode: Aggressive (full coverage)"
         echo
     } >> "$report" 2>/dev/null
     
     # Section résumé exécutif avec comptage des vulns
     {
-        echo "┌─ EXECUTIVE SUMMARY ────────────────────────────────────────────────────────┐"
+        echo "--- EXECUTIVE SUMMARY ---"
         
         # Comptage des vulns - chaque fichier vérifié séparément
         local critical=0
@@ -1310,129 +1284,125 @@ REPORT_HEADER_END
         fi
         
         # On affiche tout ça
-        echo "│ Critical Vulnerabilities: $critical"
-        echo "│ High Risk Issues: $high"
-        echo "│ Medium Risk Issues: $medium"
-        echo "│ Low Risk Items: $low"
+        echo "Critical Vulnerabilities: $critical"
+        echo "High Risk Issues: $high"
+        echo "Medium Risk Issues: $medium"
+        echo "Low Risk Items: $low"
         
         # Nombre de ports ouverts
         if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
             local ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
-            echo "│ Open Ports: $ports"
+            echo "Open Ports: $ports"
         fi
         
         # Nombre de subdomains trouvés
         if [ -f "$OUTDIR/osint/all_subdomains.txt" ]; then
             local subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
-            echo "│ Subdomains: $subs"
+            echo "Subdomains: $subs"
         fi
         
         # Calcul du score de risque sur 100
         local risk=$((critical * 10 + high * 5 + medium * 2 + low * 1))
         [ $risk -gt 100 ] && risk=100
         
-        echo "│ Risk Score: $risk/100"
+        echo "Risk Score: $risk/100"
         
         if [ $risk -ge 70 ]; then
-            echo "│ Risk Level: CRITICAL"
+            echo "Risk Level: CRITICAL"
         elif [ $risk -ge 40 ]; then
-            echo "│ Risk Level: HIGH"
+            echo "Risk Level: HIGH"
         elif [ $risk -ge 20 ]; then
-            echo "│ Risk Level: MEDIUM"
+            echo "Risk Level: MEDIUM"
         else
-            echo "│ Risk Level: LOW"
+            echo "Risk Level: LOW"
         fi
         
-        echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
     } >> "$report" 2>/dev/null
     
     # Section: Detailed Findings
     {
-        echo "┌─ DETAILED FINDINGS ────────────────────────────────────────────────────────┐"
-        echo "│"
-        echo "│ === Network Vulnerabilities ==="
+        echo "--- DETAILED FINDINGS ---"
+        echo
+        echo "=== Network Vulnerabilities ==="
         if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
             local vuln_count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
             if [ "$vuln_count" -gt 0 ]; then
-                grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | sed 's/^/│ - /'
+                grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | sed 's/^/- /'
             else
-                echo "│ - No network vulnerabilities detected"
+                echo "- No network vulnerabilities detected"
             fi
         else
-            echo "│ - No network scan performed"
+            echo "- No network scan performed"
         fi
-        echo "│"
-        echo "│ === Web Vulnerabilities ==="
+        echo
+        echo "=== Web Vulnerabilities ==="
         if [ -f "$OUTDIR/web/nuclei.txt" ]; then
             local web_vuln_lines=$(wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
             if [ "$web_vuln_lines" -gt 0 ]; then
-                head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | sed 's/^/│ - /'
+                head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | sed 's/^/- /'
             else
-                echo "│ - No web vulnerabilities detected"
+                echo "- No web vulnerabilities detected"
             fi
         else
-            echo "│ - No web scan performed"
+            echo "- No web scan performed"
         fi
-        echo "│"
-        echo "│ === Open Services ==="
+        echo
+        echo "=== Open Services ==="
         if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
             local service_count=$(grep -c "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null || echo 0)
             if [ "$service_count" -gt 0 ]; then
-                grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | sed 's/^/│ - /'
+                grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | sed 's/^/- /'
             else
-                echo "│ - No services detected"
+                echo "- No services detected"
             fi
         else
-            echo "│ - No service scan performed"
+            echo "- No service scan performed"
         fi
-        echo "│"
-        echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
     } >> "$report" 2>/dev/null
     
     # Section: Recommendations
     {
-        echo "┌─ RECOMMENDATIONS ──────────────────────────────────────────────────────────┐"
-        echo "│ Immediate Actions:"
-        echo "│   1. Patch all critical vulnerabilities"
-        echo "│   2. Disable unnecessary services"
-        echo "│   3. Implement strong authentication"
-        echo "│   4. Deploy network segmentation"
-        echo "│   5. Enable comprehensive logging"
-        echo "│"
-        echo "│ Red Team Next Steps:"
-        echo "│   1. Review exploit scripts in exploit/"
-        echo "│   2. Test default credentials"
-        echo "│   3. Run automated attacks"
-        echo "│   4. Execute Metasploit modules"
-        echo "└────────────────────────────────────────────────────────────────────────────┘"
+        echo "--- RECOMMENDATIONS ---"
+        echo
+        echo "Immediate Actions:"
+        echo "  1. Patch all critical vulnerabilities"
+        echo "  2. Disable unnecessary services"
+        echo "  3. Implement strong authentication"
+        echo "  4. Deploy network segmentation"
+        echo "  5. Enable comprehensive logging"
+        echo
+        echo "Red Team Next Steps:"
+        echo "  1. Review exploit scripts in exploit/"
+        echo "  2. Test default credentials"
+        echo "  3. Run automated attacks"
+        echo "  4. Execute Metasploit modules"
         echo
     } >> "$report" 2>/dev/null
     
     # Section: Output Files
     {
-        echo "┌─ OUTPUT FILES ─────────────────────────────────────────────────────────────┐"
-        echo "│ Location: $OUTDIR"
-        echo "│ Reports: $OUTDIR/reports/"
-        echo "│ Exploits: $OUTDIR/exploit/"
-        echo "│"
-        echo "│ Generated files:"
+        echo "--- OUTPUT FILES ---"
+        echo "Location: $OUTDIR"
+        echo "Reports: $OUTDIR/reports/"
+        echo "Exploits: $OUTDIR/exploit/"
+        echo
+        echo "Generated files:"
         local file_count=$(find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | wc -l)
         if [ "$file_count" -gt 0 ]; then
-            find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | xargs -I {} basename {} | sed 's/^/│   - /'
+            find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | xargs -I {} basename {} | sed 's/^/  - /'
         else
-            echo "│   - No files generated yet"
+            echo "  - No files generated yet"
         fi
-        echo "└────────────────────────────────────────────────────────────────────────────┘"
         echo
     } >> "$report" 2>/dev/null
     
     # Footer
     {
-        echo "╔════════════════════════════════════════════════════════════════════════════╗"
-        echo "║         Security Scanner v$VERSION - Assessment Complete                  ║"
-        echo "╚════════════════════════════════════════════════════════════════════════════╝"
+        echo "================================================================================"
+        echo "         Security Scanner v$VERSION - Assessment Complete"
+        echo "================================================================================"
         echo
         echo "REPORT GENERATED: $(date '+%Y-%m-%d %H:%M:%S')"
         echo "END OF REPORT"
@@ -1498,13 +1468,15 @@ generate_json_report() {
 }
 
 main() {
+    local AUTO_MODE=false
+    
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help) show_help; exit 0 ;;
             -v|--version) echo "Security Scanner v$VERSION"; exit 0 ;;
-            -q|--quick) QUICK_MODE=true; shift ;;
-            -s|--stealth) STEALTH_MODE=true; shift ;;
-            -a|--aggressive) AGGRESSIVE_MODE=true; shift ;;
+            -q|--quick) QUICK_MODE=true; AUTO_MODE=true; shift ;;
+            -s|--stealth) STEALTH_MODE=true; AUTO_MODE=true; shift ;;
+            -a|--aggressive) AGGRESSIVE_MODE=true; AUTO_MODE=true; shift ;;
             *) echo "Unknown option: $1"; exit 1 ;;
         esac
     done
@@ -1522,8 +1494,14 @@ main() {
     
     [ -n "$URL" ] && [ -z "$DOMAIN" ] && DOMAIN=$(echo "$URL" | sed -E 's|https?://([^/]+).*|\1|')
     
-    show_scan_menu
-    read -rp "$(echo -e ${ORANGE}Select [1-4]:${NC} )" CHOICE
+    # Si un mode automatique est activé (-q, -s, -a), on lance directement le scan complet
+    if [ "$AUTO_MODE" = true ]; then
+        CHOICE=4
+        echo -e "${GREEN}[AUTO]${NC} Automatic mode: Full Red Team assessment selected"
+    else
+        show_scan_menu
+        read -rp "$(echo -e ${ORANGE}Select [1-4]:${NC} )" CHOICE
+    fi
     
     prepare_output
     
@@ -1558,7 +1536,7 @@ main() {
     echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
     echo
     echo -e "${ORANGE}Results:${NC} ${WHITE}$OUTDIR/${NC}"
-    echo -e "${ORANGE}Report:${NC} ${WHITE}$OUTDIR/reports/executive_summary.txt${NC}"
+    echo -e "${ORANGE}Report:${NC} ${WHITE}$OUTDIR/reports/summary_report.txt${NC}"
     echo -e "${ORANGE}Scripts:${NC} ${WHITE}$OUTDIR/exploit/auto_attack.sh${NC}"
     echo
     echo -e "${YELLOW}Use responsibly - Authorized testing only${NC}"
