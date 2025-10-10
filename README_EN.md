@@ -11,6 +11,8 @@
 
 **Security Scanner v2.3.2**: Advanced red team assessment tool. Designed for professional penetration testers and security researchers.
 
+> **Note**: The summary report (summary_report.txt) currently has display issues. A fix is being implemented for version 2.3.3. Meanwhile, consult the individual files in the osint/, network/, web/ and exploit/ folders.
+
 ## What's New in v2.3.2
 
 ### Optimizations and Cleanup

@@ -528,9 +528,13 @@ main() {
     echo -e "${GREEN}                     INSTALLATION COMPLETED${NC}"
     echo "================================================================"
     echo -e "${WHITE}Usage:${NC}"
-    echo -e "  ${CYAN}security${NC}           # Start interactive scanner"
+    echo -e "  ${CYAN}sudo security${NC}      # Start interactive scanner (recommended)"
+    echo -e "  ${CYAN}security${NC}           # Start without sudo (limited features)"
     echo -e "  ${CYAN}security --help${NC}    # Show help information"
     echo -e "  ${CYAN}security --version${NC} # Show version"
+    echo
+    echo -e "${YELLOW}Important:${NC} Running with ${WHITE}sudo${NC} is ${GREEN}recommended${NC} for full functionality"
+    echo -e "           (UDP scans, OS detection, raw packet manipulation)"
     echo
     echo -e "${WHITE}Features installed:${NC}"
     echo -e "  ${GREEN}✓${NC} Security Scanner executable"

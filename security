@@ -80,7 +80,7 @@ EOF
     echo -e "${GRAY}Any use on systems without prior written permission is ${RED}ILLEGAL${GRAY}.${NC}"
     echo
     echo -e "${DIM}The author disclaims all responsibility for misuse of this tool.${NC}"
-    echo -e "${DIM}With great power comes great... legal paperwork.${NC}"
+    echo -e "${DIM}\"With great power comes great... legal paperwork.\" - Uncle Ben, probably${NC}"
     echo -e "${YELLOW}=================================================================================${NC}"
     echo
 }
