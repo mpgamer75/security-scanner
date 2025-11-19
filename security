@@ -1208,178 +1208,171 @@ REPORT_HEADER_END
     } >> "$report" 2>/dev/null
     
     # Section résumé exécutif avec comptage des vulns
-    {
-        echo "--- EXECUTIVE SUMMARY ---"
-        
-        # Comptage des vulns - chaque fichier vérifié séparément
-        local critical=0
-        local high=0
-        local medium=0
-        local low=0
-        
-        # Vulns critiques trouvées
-        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-            local count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
-            critical=$((critical + count))
-        fi
-        if [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ]; then
-            local count=$(grep -ci "CRITICAL\|ms17-010\|EternalBlue" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null || echo 0)
-            critical=$((critical + count))
-        fi
-        if [ -f "$OUTDIR/network/smb_enum.txt" ]; then
-            local count=$(grep -ci "VULNERABLE" "$OUTDIR/network/smb_enum.txt" 2>/dev/null || echo 0)
-            critical=$((critical + count))
-        fi
-        
-        # Problèmes à risque élevé
-        if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-            local count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
-            high=$((high + count))
-        fi
-        if [ -f "$OUTDIR/web/nikto.txt" ]; then
-            local count=$(grep -ci "high" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
-            high=$((high + count))
-        fi
-        
-        # Risques moyens
-        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-            local count=$(grep -ci "medium\|warning" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
-            medium=$((medium + count))
-        fi
-        if [ -f "$OUTDIR/web/nikto.txt" ]; then
-            local count=$(grep -ci "medium\|warning" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
-            medium=$((medium + count))
-        fi
-        
-        # Items à faible risque (ports ouverts basiques)
-        if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
-            low=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
-        fi
-        
-        # On affiche tout ça
-        echo "Critical Vulnerabilities: $critical"
-        echo "High Risk Issues: $high"
-        echo "Medium Risk Issues: $medium"
-        echo "Low Risk Items: $low"
-        
-        # Nombre de ports ouverts
-        if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
-            local ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
-            echo "Open Ports: $ports"
-        fi
-        
-        # Nombre de subdomains trouvés
-        if [ -f "$OUTDIR/osint/all_subdomains.txt" ]; then
-            local subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
-            echo "Subdomains: $subs"
-        fi
-        
-        # Calcul du score de risque sur 100
-        local risk=$((critical * 10 + high * 5 + medium * 2 + low * 1))
-        [ $risk -gt 100 ] && risk=100
-        
-        echo "Risk Score: $risk/100"
-        
-        if [ $risk -ge 70 ]; then
-            echo "Risk Level: CRITICAL"
-        elif [ $risk -ge 40 ]; then
-            echo "Risk Level: HIGH"
-        elif [ $risk -ge 20 ]; then
-            echo "Risk Level: MEDIUM"
-        else
-            echo "Risk Level: LOW"
-        fi
-        
-        echo
-    } >> "$report" 2>/dev/null
+    echo "--- EXECUTIVE SUMMARY ---" >> "$report"
+    echo "" >> "$report"
+
+    # Comptage des vulns - chaque fichier vérifié séparément
+    critical=0
+    high=0
+    medium=0
+    low=0
+
+    # Vulns critiques trouvées
+    if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+        count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+        critical=$((critical + count))
+    fi
+    if [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ]; then
+        count=$(grep -ci "CRITICAL\|ms17-010\|EternalBlue" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null || echo 0)
+        critical=$((critical + count))
+    fi
+    if [ -f "$OUTDIR/network/smb_enum.txt" ]; then
+        count=$(grep -ci "VULNERABLE" "$OUTDIR/network/smb_enum.txt" 2>/dev/null || echo 0)
+        critical=$((critical + count))
+    fi
+
+    # Problèmes à risque élevé
+    if [ -f "$OUTDIR/web/nuclei.txt" ]; then
+        count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
+        high=$((high + count))
+    fi
+    if [ -f "$OUTDIR/web/nikto.txt" ]; then
+        count=$(grep -ci "high" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
+        high=$((high + count))
+    fi
+
+    # Risques moyens
+    if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+        count=$(grep -ci "medium\|warning" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+        medium=$((medium + count))
+    fi
+    if [ -f "$OUTDIR/web/nikto.txt" ]; then
+        count=$(grep -ci "medium\|warning" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
+        medium=$((medium + count))
+    fi
+
+    # Items à faible risque (ports ouverts basiques)
+    if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
+        low=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
+    fi
+
+    # On affiche tout ça
+    echo "Critical Vulnerabilities: $critical" >> "$report"
+    echo "High Risk Issues: $high" >> "$report"
+    echo "Medium Risk Issues: $medium" >> "$report"
+    echo "Low Risk Items: $low" >> "$report"
+
+    # Nombre de ports ouverts
+    if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
+        ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
+        echo "Open Ports: $ports" >> "$report"
+    fi
+
+    # Nombre de subdomains trouvés
+    if [ -f "$OUTDIR/osint/all_subdomains.txt" ]; then
+        subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
+        echo "Subdomains: $subs" >> "$report"
+    fi
+
+    # Calcul du score de risque sur 100
+    risk=$((critical * 10 + high * 5 + medium * 2 + low * 1))
+    [ $risk -gt 100 ] && risk=100
+
+    echo "Risk Score: $risk/100" >> "$report"
+
+    if [ $risk -ge 70 ]; then
+        echo "Risk Level: CRITICAL" >> "$report"
+    elif [ $risk -ge 40 ]; then
+        echo "Risk Level: HIGH" >> "$report"
+    elif [ $risk -ge 20 ]; then
+        echo "Risk Level: MEDIUM" >> "$report"
+    else
+        echo "Risk Level: LOW" >> "$report"
+    fi
+
+    echo "" >> "$report"
     
     # Section: Detailed Findings
-    {
-        echo "--- DETAILED FINDINGS ---"
-        echo
-        echo "=== Network Vulnerabilities ==="
-        if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-            local vuln_count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
-            if [ "$vuln_count" -gt 0 ]; then
-                grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | sed 's/^/- /'
-            else
-                echo "- No network vulnerabilities detected"
-            fi
+    echo "--- DETAILED FINDINGS ---" >> "$report"
+    echo "" >> "$report"
+    echo "=== Network Vulnerabilities ===" >> "$report"
+    if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
+        vuln_count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+        if [ "$vuln_count" -gt 0 ]; then
+            grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -10 | sed 's/^/- /' >> "$report"
         else
-            echo "- No network scan performed"
+            echo "- No network vulnerabilities detected" >> "$report"
         fi
-        echo
-        echo "=== Web Vulnerabilities ==="
-        if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-            local web_vuln_lines=$(wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
-            if [ "$web_vuln_lines" -gt 0 ]; then
-                head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | sed 's/^/- /'
-            else
-                echo "- No web vulnerabilities detected"
-            fi
+    else
+        echo "- No network scan performed" >> "$report"
+    fi
+    echo "" >> "$report"
+
+    echo "=== Web Vulnerabilities ===" >> "$report"
+    if [ -f "$OUTDIR/web/nuclei.txt" ]; then
+        web_vuln_lines=$(wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
+        if [ "$web_vuln_lines" -gt 0 ]; then
+            head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | sed 's/^/- /' >> "$report"
         else
-            echo "- No web scan performed"
+            echo "- No web vulnerabilities detected" >> "$report"
         fi
-        echo
-        echo "=== Open Services ==="
-        if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
-            local service_count=$(grep -c "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null || echo 0)
-            if [ "$service_count" -gt 0 ]; then
-                grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | sed 's/^/- /'
-            else
-                echo "- No services detected"
-            fi
+    else
+        echo "- No web scan performed" >> "$report"
+    fi
+    echo "" >> "$report"
+
+    echo "=== Open Services ===" >> "$report"
+    if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
+        service_count=$(grep -c "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null || echo 0)
+        if [ "$service_count" -gt 0 ]; then
+            grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -15 | sed 's/^/- /' >> "$report"
         else
-            echo "- No service scan performed"
+            echo "- No services detected" >> "$report"
         fi
-        echo
-    } >> "$report" 2>/dev/null
+    else
+        echo "- No service scan performed" >> "$report"
+    fi
+    echo "" >> "$report"
     
     # Section: Recommendations
-    {
-        echo "--- RECOMMENDATIONS ---"
-        echo
-        echo "Immediate Actions:"
-        echo "  1. Patch all critical vulnerabilities"
-        echo "  2. Disable unnecessary services"
-        echo "  3. Implement strong authentication"
-        echo "  4. Deploy network segmentation"
-        echo "  5. Enable comprehensive logging"
-        echo
-        echo "Red Team Next Steps:"
-        echo "  1. Review exploit scripts in exploit/"
-        echo "  2. Test default credentials"
-        echo "  3. Run automated attacks"
-        echo "  4. Execute Metasploit modules"
-        echo
-    } >> "$report" 2>/dev/null
+    echo "--- RECOMMENDATIONS ---" >> "$report"
+    echo "" >> "$report"
+    echo "Immediate Actions:" >> "$report"
+    echo "  1. Patch all critical vulnerabilities" >> "$report"
+    echo "  2. Disable unnecessary services" >> "$report"
+    echo "  3. Implement strong authentication" >> "$report"
+    echo "  4. Deploy network segmentation" >> "$report"
+    echo "  5. Enable comprehensive logging" >> "$report"
+    echo "" >> "$report"
+    echo "Red Team Next Steps:" >> "$report"
+    echo "  1. Review exploit scripts in exploit/" >> "$report"
+    echo "  2. Test default credentials" >> "$report"
+    echo "  3. Run automated attacks" >> "$report"
+    echo "  4. Execute Metasploit modules" >> "$report"
+    echo "" >> "$report"
     
     # Section: Output Files
-    {
-        echo "--- OUTPUT FILES ---"
-        echo "Location: $OUTDIR"
-        echo "Reports: $OUTDIR/reports/"
-        echo "Exploits: $OUTDIR/exploit/"
-        echo
-        echo "Generated files:"
-        local file_count=$(find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | wc -l)
-        if [ "$file_count" -gt 0 ]; then
-            find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | xargs -I {} basename {} | sed 's/^/  - /'
-        else
-            echo "  - No files generated yet"
-        fi
-        echo
-    } >> "$report" 2>/dev/null
+    echo "--- OUTPUT FILES ---" >> "$report"
+    echo "Location: $OUTDIR" >> "$report"
+    echo "Reports: $OUTDIR/reports/" >> "$report"
+    echo "Exploits: $OUTDIR/exploit/" >> "$report"
+    echo "" >> "$report"
+    echo "Generated files:" >> "$report"
+    file_count=$(find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | wc -l)
+    if [ "$file_count" -gt 0 ]; then
+        find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -20 | xargs -I {} basename {} | sed 's/^/  - /' >> "$report"
+    else
+        echo "  - No files generated yet" >> "$report"
+    fi
+    echo "" >> "$report"
     
     # Footer
-    {
-        echo "================================================================================"
-        echo "         Security Scanner v$VERSION - Assessment Complete"
-        echo "================================================================================"
-        echo
-        echo "REPORT GENERATED: $(date '+%Y-%m-%d %H:%M:%S')"
-        echo "END OF REPORT"
-    } >> "$report" 2>/dev/null
+    echo "================================================================================" >> "$report"
+    echo "         Security Scanner v$VERSION - Assessment Complete" >> "$report"
+    echo "================================================================================" >> "$report"
+    echo "" >> "$report"
+    echo "REPORT GENERATED: $(date '+%Y-%m-%d %H:%M:%S')" >> "$report"
+    echo "END OF REPORT" >> "$report"
     
     set -e
     
