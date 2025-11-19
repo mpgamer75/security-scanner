@@ -562,42 +562,68 @@ run_network_scans() {
          --script-args unsafe=1 --host-timeout 12m '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_critical_vulns.txt"
     
-    # Enum SMB complète - j'ai enfin réussi à fix les bugs
-    execute_scan "SMB Enumeration (ROBUST)" \
-        "smb_check=\$(timeout 30 nmap -Pn -p 139,445 --open '$target' 2>/dev/null | grep -E '139/tcp|445/tcp' | grep open)
+    # Enum SMB complète - optimisée pour performance
+    execute_scan "SMB Enumeration (OPTIMIZED)" \
+        "# Check rapide des ports SMB
+         smb_check=\$(timeout 20 nmap -Pn -p 139,445 --open -T4 --min-rate 1000 '$target' 2>/dev/null | grep -E '139/tcp|445/tcp' | grep open)
+
          if [ -n \"\$smb_check\" ]; then
              echo 'SMB ports detected: YES'
              echo 'Open SMB ports:'
              echo \"\$smb_check\"
              echo
-             echo '=== SMB Version Detection ==='
-             timeout 120 nmap -Pn -p 139,445 --script smb-protocols,smb-security-mode,smb-os-discovery \
-                  --script-timeout 45s --host-timeout 3m '$target' 2>/dev/null || echo 'SMB version detection timeout'
-             echo
-             echo '=== SMB Shares Enumeration ==='
-             timeout 120 nmap -Pn -p 445 --script smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-users \
-                  --script-timeout 45s --host-timeout 3m '$target' 2>/dev/null || echo 'SMB shares enum timeout'
-             echo
-             echo '=== SMB Vulnerability Scan ==='
-             timeout 150 nmap -Pn -p 445 --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-conficker \
-                  --script-timeout 30s --host-timeout 2m '$target' 2>/dev/null || echo 'SMB vuln scan timeout'
-             if command -v enum4linux &> /dev/null; then
-                 echo
-                 echo '=== Enum4linux Results ==='
-                 timeout 90 enum4linux -a '$target' 2>/dev/null | head -100 || echo 'enum4linux timeout or failed'
+
+             # Déterminer quels ports sont ouverts pour optimiser les scans
+             port_139=\$(echo \"\$smb_check\" | grep -q '139/tcp' && echo 'yes' || echo 'no')
+             port_445=\$(echo \"\$smb_check\" | grep -q '445/tcp' && echo 'yes' || echo 'no')
+
+             # Définir les ports à scanner
+             if [ \"\$port_139\" = 'yes' ] && [ \"\$port_445\" = 'yes' ]; then
+                 smb_ports='139,445'
+             elif [ \"\$port_445\" = 'yes' ]; then
+                 smb_ports='445'
+             else
+                 smb_ports='139'
              fi
-             if command -v smbclient &> /dev/null; then
+
+             echo '=== SMB Version & Security ==='
+             timeout 90 nmap -Pn -p \$smb_ports \
+                  --script smb-protocols,smb-security-mode,smb-os-discovery \
+                  --script-timeout 30s -T4 '$target' 2>/dev/null || echo 'SMB version detection timeout'
+             echo
+
+             # SMB Enumeration - seulement si port 445 ouvert
+             if [ \"\$port_445\" = 'yes' ]; then
+                 echo '=== SMB Shares & Users ==='
+                 timeout 90 nmap -Pn -p 445 \
+                      --script smb-enum-shares,smb-enum-users \
+                      --script-timeout 30s -T4 '$target' 2>/dev/null || echo 'SMB enum timeout'
                  echo
+             fi
+
+             # Scan de vulnérabilités critiques - PRIORITAIRE
+             echo '=== SMB Critical Vulnerabilities ==='
+             timeout 120 nmap -Pn -p \$smb_ports \
+                  --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-cve2009-3103 \
+                  --script-timeout 25s -T4 '$target' 2>/dev/null || echo 'SMB vuln scan timeout'
+             echo
+
+             # Outils complémentaires si disponibles (en parallèle)
+             if command -v smbclient &> /dev/null; then
                  echo '=== SMB Null Session Test ==='
-                 timeout 30 smbclient -L '$target' -N 2>/dev/null | head -50 || echo 'SMB null session failed'
+                 timeout 25 smbclient -L '$target' -N 2>/dev/null | head -40 || echo 'SMB null session failed'
+                 echo
+             fi
+
+             if command -v enum4linux &> /dev/null && [ '$AGGRESSIVE_MODE' = true ]; then
+                 echo '=== Enum4linux (Aggressive Mode) ==='
+                 timeout 60 enum4linux -U -S -G '$target' 2>/dev/null | head -80 || echo 'enum4linux timeout'
              fi
          else
              echo 'SMB ports (139/445): NOT OPEN or FILTERED'
-             echo 'Attempting basic SMB scan anyway...'
-             timeout 60 nmap -Pn -p 139,445 --script smb-protocols,smb-os-discovery \
-                  --script-timeout 30s '$target' 2>/dev/null || echo 'SMB not accessible'
+             echo 'No SMB enumeration performed'
          fi" \
-        $TIMEOUT_VERY_LONG "$OUTDIR/network/smb_enum.txt"
+        $TIMEOUT_LONG "$OUTDIR/network/smb_enum.txt"
     
     # Enum SNMP sur le port 161
     execute_scan "SNMP Enumeration" \
@@ -694,32 +720,56 @@ run_web_scans() {
         fi
     fi
     
-    # Scan de vulns web avec Nuclei - super outil
+    # Scan de vulns web avec Nuclei - optimisé pour stabilité
     if command -v nuclei &> /dev/null; then
         local severity="-severity critical,high,medium"
         local nuclei_timeout=$TIMEOUT_LONG
-        
+        local rate_limit="150"  # Requests per second
+        local template_timeout="30"  # Timeout per template en secondes
+
         if [ "$QUICK_MODE" = true ]; then
             severity="-severity critical,high"
             nuclei_timeout=$TIMEOUT_MEDIUM
+            rate_limit="200"
+            template_timeout="20"
         elif [ "$AGGRESSIVE_MODE" = true ]; then
             severity="-severity critical,high,medium,low"
             nuclei_timeout=$TIMEOUT_VERY_LONG
+            rate_limit="100"
+            template_timeout="45"
         fi
-        
+
+        # Mise à jour des templates avant le scan (en arrière-plan pour ne pas bloquer)
+        (nuclei -update-templates -silent &>/dev/null &)
+
         execute_scan "Vulnerability Scanning (Nuclei)" \
-            "nuclei -u '$url' $severity -silent -timeout 10 -retries 1 -concurrency 25 2>/dev/null | \
-             head -200 || echo 'Nuclei failed'" \
+            "nuclei -u '$url' $severity -silent \
+             -timeout $template_timeout -retries 2 \
+             -rate-limit $rate_limit -concurrency 20 \
+             -no-interactsh -no-color \
+             -stats -stats-interval 30 \
+             2>/dev/null | head -200 || echo 'Nuclei completed with errors'" \
             $nuclei_timeout "$OUTDIR/web/nuclei.txt"
     fi
-    
-    # Scan Nikto pour les vulns web classiques
+
+    # Scan Nikto pour les vulns web classiques - optimisé
     if command -v nikto &> /dev/null && [ "$QUICK_MODE" != true ]; then
         local nikto_timeout=$TIMEOUT_LONG
-        [ "$AGGRESSIVE_MODE" = true ] && nikto_timeout=$TIMEOUT_VERY_LONG
-        
+        local nikto_tuning="-Tuning x"  # Tests génériques
+
+        if [ "$AGGRESSIVE_MODE" = true ]; then
+            nikto_timeout=$TIMEOUT_VERY_LONG
+            nikto_tuning="-Tuning 123456789ab"  # Tous les tests
+        fi
+
         execute_scan "Nikto Web Vulnerability Scan" \
-            "nikto -h '$url' -C all -Format txt -o '$OUTDIR/web/nikto.txt' -Tuning x 2>&1 | head -300 || echo 'Nikto scan completed'" \
+            "nikto -h '$url' \
+             -C all \
+             $nikto_tuning \
+             -timeout 20 \
+             -maxtime $nikto_timeout \
+             -output '$OUTDIR/web/nikto_raw.txt' \
+             2>&1 | tee '$OUTDIR/web/nikto.txt' || echo 'Nikto scan completed'" \
             $nikto_timeout "$OUTDIR/web/nikto.txt"
     fi
     
