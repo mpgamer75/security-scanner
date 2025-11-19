@@ -562,42 +562,68 @@ run_network_scans() {
          --script-args unsafe=1 --host-timeout 12m '$target' 2>/dev/null" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_critical_vulns.txt"
     
-    # Enum SMB complète - j'ai enfin réussi à fix les bugs
-    execute_scan "SMB Enumeration (ROBUST)" \
-        "smb_check=\$(timeout 30 nmap -Pn -p 139,445 --open '$target' 2>/dev/null | grep -E '139/tcp|445/tcp' | grep open)
+    # Enum SMB complète - optimisée pour performance
+    execute_scan "SMB Enumeration (OPTIMIZED)" \
+        "# Check rapide des ports SMB
+         smb_check=\$(timeout 20 nmap -Pn -p 139,445 --open -T4 --min-rate 1000 '$target' 2>/dev/null | grep -E '139/tcp|445/tcp' | grep open)
+
          if [ -n \"\$smb_check\" ]; then
              echo 'SMB ports detected: YES'
              echo 'Open SMB ports:'
              echo \"\$smb_check\"
              echo
-             echo '=== SMB Version Detection ==='
-             timeout 120 nmap -Pn -p 139,445 --script smb-protocols,smb-security-mode,smb-os-discovery \
-                  --script-timeout 45s --host-timeout 3m '$target' 2>/dev/null || echo 'SMB version detection timeout'
-             echo
-             echo '=== SMB Shares Enumeration ==='
-             timeout 120 nmap -Pn -p 445 --script smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-users \
-                  --script-timeout 45s --host-timeout 3m '$target' 2>/dev/null || echo 'SMB shares enum timeout'
-             echo
-             echo '=== SMB Vulnerability Scan ==='
-             timeout 150 nmap -Pn -p 445 --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-conficker \
-                  --script-timeout 30s --host-timeout 2m '$target' 2>/dev/null || echo 'SMB vuln scan timeout'
-             if command -v enum4linux &> /dev/null; then
-                 echo
-                 echo '=== Enum4linux Results ==='
-                 timeout 90 enum4linux -a '$target' 2>/dev/null | head -100 || echo 'enum4linux timeout or failed'
+
+             # Déterminer quels ports sont ouverts pour optimiser les scans
+             port_139=\$(echo \"\$smb_check\" | grep -q '139/tcp' && echo 'yes' || echo 'no')
+             port_445=\$(echo \"\$smb_check\" | grep -q '445/tcp' && echo 'yes' || echo 'no')
+
+             # Définir les ports à scanner
+             if [ \"\$port_139\" = 'yes' ] && [ \"\$port_445\" = 'yes' ]; then
+                 smb_ports='139,445'
+             elif [ \"\$port_445\" = 'yes' ]; then
+                 smb_ports='445'
+             else
+                 smb_ports='139'
              fi
-             if command -v smbclient &> /dev/null; then
+
+             echo '=== SMB Version & Security ==='
+             timeout 90 nmap -Pn -p \$smb_ports \
+                  --script smb-protocols,smb-security-mode,smb-os-discovery \
+                  --script-timeout 30s -T4 '$target' 2>/dev/null || echo 'SMB version detection timeout'
+             echo
+
+             # SMB Enumeration - seulement si port 445 ouvert
+             if [ \"\$port_445\" = 'yes' ]; then
+                 echo '=== SMB Shares & Users ==='
+                 timeout 90 nmap -Pn -p 445 \
+                      --script smb-enum-shares,smb-enum-users \
+                      --script-timeout 30s -T4 '$target' 2>/dev/null || echo 'SMB enum timeout'
                  echo
+             fi
+
+             # Scan de vulnérabilités critiques - PRIORITAIRE
+             echo '=== SMB Critical Vulnerabilities ==='
+             timeout 120 nmap -Pn -p \$smb_ports \
+                  --script smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-cve2009-3103 \
+                  --script-timeout 25s -T4 '$target' 2>/dev/null || echo 'SMB vuln scan timeout'
+             echo
+
+             # Outils complémentaires si disponibles (en parallèle)
+             if command -v smbclient &> /dev/null; then
                  echo '=== SMB Null Session Test ==='
-                 timeout 30 smbclient -L '$target' -N 2>/dev/null | head -50 || echo 'SMB null session failed'
+                 timeout 25 smbclient -L '$target' -N 2>/dev/null | head -40 || echo 'SMB null session failed'
+                 echo
+             fi
+
+             if command -v enum4linux &> /dev/null && [ '$AGGRESSIVE_MODE' = true ]; then
+                 echo '=== Enum4linux (Aggressive Mode) ==='
+                 timeout 60 enum4linux -U -S -G '$target' 2>/dev/null | head -80 || echo 'enum4linux timeout'
              fi
          else
              echo 'SMB ports (139/445): NOT OPEN or FILTERED'
-             echo 'Attempting basic SMB scan anyway...'
-             timeout 60 nmap -Pn -p 139,445 --script smb-protocols,smb-os-discovery \
-                  --script-timeout 30s '$target' 2>/dev/null || echo 'SMB not accessible'
+             echo 'No SMB enumeration performed'
          fi" \
-        $TIMEOUT_VERY_LONG "$OUTDIR/network/smb_enum.txt"
+        $TIMEOUT_LONG "$OUTDIR/network/smb_enum.txt"
     
     # Enum SNMP sur le port 161
     execute_scan "SNMP Enumeration" \
@@ -694,32 +720,56 @@ run_web_scans() {
         fi
     fi
     
-    # Scan de vulns web avec Nuclei - super outil
+    # Scan de vulns web avec Nuclei - optimisé pour stabilité
     if command -v nuclei &> /dev/null; then
         local severity="-severity critical,high,medium"
         local nuclei_timeout=$TIMEOUT_LONG
-        
+        local rate_limit="150"  # Requests per second
+        local template_timeout="30"  # Timeout per template en secondes
+
         if [ "$QUICK_MODE" = true ]; then
             severity="-severity critical,high"
             nuclei_timeout=$TIMEOUT_MEDIUM
+            rate_limit="200"
+            template_timeout="20"
         elif [ "$AGGRESSIVE_MODE" = true ]; then
             severity="-severity critical,high,medium,low"
             nuclei_timeout=$TIMEOUT_VERY_LONG
+            rate_limit="100"
+            template_timeout="45"
         fi
-        
+
+        # Mise à jour des templates avant le scan (en arrière-plan pour ne pas bloquer)
+        (nuclei -update-templates -silent &>/dev/null &)
+
         execute_scan "Vulnerability Scanning (Nuclei)" \
-            "nuclei -u '$url' $severity -silent -timeout 10 -retries 1 -concurrency 25 2>/dev/null | \
-             head -200 || echo 'Nuclei failed'" \
+            "nuclei -u '$url' $severity -silent \
+             -timeout $template_timeout -retries 2 \
+             -rate-limit $rate_limit -concurrency 20 \
+             -no-interactsh -no-color \
+             -stats -stats-interval 30 \
+             2>/dev/null | head -200 || echo 'Nuclei completed with errors'" \
             $nuclei_timeout "$OUTDIR/web/nuclei.txt"
     fi
-    
-    # Scan Nikto pour les vulns web classiques
+
+    # Scan Nikto pour les vulns web classiques - optimisé
     if command -v nikto &> /dev/null && [ "$QUICK_MODE" != true ]; then
         local nikto_timeout=$TIMEOUT_LONG
-        [ "$AGGRESSIVE_MODE" = true ] && nikto_timeout=$TIMEOUT_VERY_LONG
-        
+        local nikto_tuning="-Tuning x"  # Tests génériques
+
+        if [ "$AGGRESSIVE_MODE" = true ]; then
+            nikto_timeout=$TIMEOUT_VERY_LONG
+            nikto_tuning="-Tuning 123456789ab"  # Tous les tests
+        fi
+
         execute_scan "Nikto Web Vulnerability Scan" \
-            "nikto -h '$url' -C all -Format txt -o '$OUTDIR/web/nikto.txt' -Tuning x 2>&1 | head -300 || echo 'Nikto scan completed'" \
+            "nikto -h '$url' \
+             -C all \
+             $nikto_tuning \
+             -timeout 20 \
+             -maxtime $nikto_timeout \
+             -output '$OUTDIR/web/nikto_raw.txt' \
+             2>&1 | tee '$OUTDIR/web/nikto.txt' || echo 'Nikto scan completed'" \
             $nikto_timeout "$OUTDIR/web/nikto.txt"
     fi
     
@@ -1455,563 +1505,33 @@ generate_json_report() {
 
 generate_html_report() {
     local html="$OUTDIR/reports/assessment.html"
+    local html_gen_script="$(dirname "$0")/html_generator.py"
 
     echo -e "${CYAN}[REPORT]${NC} Generating HTML report..."
 
-    # Calcul des statistiques pour le rapport
-    local critical=0
-    local high=0
-    local medium=0
-    local low=0
-    local ports=0
-    local subs=0
-
-    [ -f "$OUTDIR/network/nmap_vulns.txt" ] && critical=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
-    critical=${critical:-0}
-    [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ] && high=$(grep -ci "CRITICAL\|ms17-010" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
-    high=${high:-0}
-    [ -f "$OUTDIR/web/nuclei.txt" ] && medium=$(grep -ci "medium" "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d '\n' || echo "0")
-    medium=${medium:-0}
-    [ -f "$OUTDIR/network/nmap_ports.txt" ] && ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null | tr -d '\n' || echo "0")
-    ports=${ports:-0}
-    [ -f "$OUTDIR/osint/all_subdomains.txt" ] && subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null | tr -d '\n' || echo "0")
-    subs=${subs:-0}
-
-    local risk=$((critical * 10 + high * 5 + medium * 2))
-    [ $risk -gt 100 ] && risk=100
-
-    local risk_level="LOW"
-    local risk_color="#28a745"
-    if [ $risk -ge 70 ]; then
-        risk_level="CRITICAL"
-        risk_color="#dc3545"
-    elif [ $risk -ge 40 ]; then
-        risk_level="HIGH"
-        risk_color="#fd7e14"
-    elif [ $risk -ge 20 ]; then
-        risk_level="MEDIUM"
-        risk_color="#ffc107"
+    # Check if Python generator exists
+    if [ ! -f "$html_gen_script" ]; then
+        echo -e "${YELLOW}[WARN]${NC} HTML generator not found at $html_gen_script"
+        echo -e "${YELLOW}[INFO]${NC} Skipping HTML generation"
+        return 1
     fi
 
+    # Determine scan mode
     local scan_mode="Standard"
     [ "$QUICK_MODE" = true ] && scan_mode="Quick (3x faster)"
     [ "$STEALTH_MODE" = true ] && scan_mode="Stealth (IDS/IPS evasion)"
     [ "$AGGRESSIVE_MODE" = true ] && scan_mode="Aggressive (full coverage)"
 
-    # Génération du fichier HTML
-    cat > "$html" << 'HTML_START'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Assessment Report</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            line-height: 1.6;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(26, 26, 46, 0.95);
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            padding: 40px;
-            text-align: center;
-            border-bottom: 4px solid #c0392b;
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .header .subtitle {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            padding: 30px;
-            background: rgba(22, 33, 62, 0.6);
-        }
-
-        .info-card {
-            background: rgba(52, 73, 94, 0.8);
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid #3498db;
-        }
-
-        .info-card h3 {
-            color: #3498db;
-            margin-bottom: 10px;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .info-card p {
-            font-size: 1.1em;
-            color: #ecf0f1;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            padding: 30px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .stat-card .number {
-            font-size: 3em;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .stat-card .label {
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.8;
-        }
-
-        .stat-card.critical .number { color: #e74c3c; }
-        .stat-card.high .number { color: #fd7e14; }
-        .stat-card.medium .number { color: #f39c12; }
-        .stat-card.low .number { color: #3498db; }
-        .stat-card.info .number { color: #1abc9c; }
-
-        .section {
-            padding: 30px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .section h2 {
-            font-size: 1.8em;
-            margin-bottom: 20px;
-            color: #e74c3c;
-            border-bottom: 2px solid #e74c3c;
-            padding-bottom: 10px;
-        }
-
-        .risk-badge {
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 1.2em;
-            margin: 10px 0;
-        }
-
-        .findings-list {
-            background: rgba(52, 73, 94, 0.5);
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-
-        .finding-item {
-            background: rgba(44, 62, 80, 0.7);
-            padding: 15px;
-            margin: 10px 0;
-            border-left: 4px solid #e74c3c;
-            border-radius: 5px;
-        }
-
-        .finding-item.high {
-            border-left-color: #fd7e14;
-        }
-
-        .finding-item.medium {
-            border-left-color: #f39c12;
-        }
-
-        .finding-item.low {
-            border-left-color: #3498db;
-        }
-
-        .code-block {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 10px 0;
-            overflow-x: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-
-        .recommendation {
-            background: rgba(52, 152, 219, 0.2);
-            border-left: 4px solid #3498db;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-        }
-
-        .footer {
-            background: rgba(22, 33, 62, 0.8);
-            padding: 20px;
-            text-align: center;
-            border-top: 2px solid #e74c3c;
-            margin-top: 20px;
-        }
-
-        details {
-            background: rgba(52, 73, 94, 0.5);
-            border-radius: 10px;
-            padding: 15px;
-            margin: 15px 0;
-            cursor: pointer;
-        }
-
-        summary {
-            font-weight: bold;
-            font-size: 1.1em;
-            color: #3498db;
-            cursor: pointer;
-            padding: 10px;
-        }
-
-        summary:hover {
-            color: #5dade2;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background: rgba(44, 62, 80, 0.5);
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        th {
-            background: rgba(231, 76, 60, 0.8);
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.9em;
-        }
-
-        tr:hover {
-            background: rgba(52, 73, 94, 0.7);
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-
-        .badge.critical { background: #e74c3c; }
-        .badge.high { background: #fd7e14; }
-        .badge.medium { background: #f39c12; }
-        .badge.low { background: #3498db; }
-
-        @media print {
-            body {
-                background: white;
-                color: black;
-            }
-
-            .container {
-                box-shadow: none;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🔒 SECURITY ASSESSMENT REPORT</h1>
-            <div class="subtitle">Red Team Penetration Testing</div>
-        </div>
-HTML_START
-
-    # Injection des données dynamiques
-    cat >> "$html" << HTML_INFO
-        <div class="info-grid">
-            <div class="info-card">
-                <h3>Target</h3>
-                <p>${TARGET}</p>
-            </div>
-HTML_INFO
-
-    [ -n "$URL" ] && cat >> "$html" << HTML_URL
-            <div class="info-card">
-                <h3>URL</h3>
-                <p>${URL}</p>
-            </div>
-HTML_URL
-
-    [ -n "$DOMAIN" ] && cat >> "$html" << HTML_DOMAIN
-            <div class="info-card">
-                <h3>Domain</h3>
-                <p>${DOMAIN}</p>
-            </div>
-HTML_DOMAIN
-
-    cat >> "$html" << HTML_DATE
-            <div class="info-card">
-                <h3>Assessment Date</h3>
-                <p>$(date '+%Y-%m-%d %H:%M:%S')</p>
-            </div>
-            <div class="info-card">
-                <h3>Scanner Version</h3>
-                <p>Security Scanner v${VERSION}</p>
-            </div>
-            <div class="info-card">
-                <h3>Scan Mode</h3>
-                <p>${scan_mode}</p>
-            </div>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card critical">
-                <div class="number">${critical}</div>
-                <div class="label">Critical Vulnerabilities</div>
-            </div>
-            <div class="stat-card high">
-                <div class="number">${high}</div>
-                <div class="label">High Risk Issues</div>
-            </div>
-            <div class="stat-card medium">
-                <div class="number">${medium}</div>
-                <div class="label">Medium Risk Issues</div>
-            </div>
-            <div class="stat-card info">
-                <div class="number">${ports}</div>
-                <div class="label">Open Ports</div>
-            </div>
-            <div class="stat-card info">
-                <div class="number">${subs}</div>
-                <div class="label">Subdomains Found</div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>📊 Risk Assessment</h2>
-            <p><strong>Risk Score:</strong> ${risk}/100</p>
-            <div class="risk-badge" style="background-color: ${risk_color};">
-                Risk Level: ${risk_level}
-            </div>
-        </div>
-HTML_DATE
-
-    # Section des vulnérabilités réseau
-    cat >> "$html" << 'HTML_NETWORK'
-        <div class="section">
-            <h2>🌐 Network Vulnerabilities</h2>
-            <details>
-                <summary>View Network Findings</summary>
-                <div class="findings-list">
-HTML_NETWORK
-
-    if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-        grep -i "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | head -20 | while IFS= read -r line; do
-            echo "                    <div class=\"finding-item\">" >> "$html"
-            echo "                        <p>${line}</p>" >> "$html"
-            echo "                    </div>" >> "$html"
-        done
-    else
-        echo "                    <p>No network vulnerabilities detected or scan not performed</p>" >> "$html"
-    fi
-
-    cat >> "$html" << 'HTML_NETWORK_END'
-                </div>
-            </details>
-        </div>
-HTML_NETWORK_END
-
-    # Section des vulnérabilités web
-    cat >> "$html" << 'HTML_WEB'
-        <div class="section">
-            <h2>🌍 Web Application Vulnerabilities</h2>
-            <details>
-                <summary>View Web Findings</summary>
-                <div class="findings-list">
-HTML_WEB
-
-    if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-        head -20 "$OUTDIR/web/nuclei.txt" 2>/dev/null | while IFS= read -r line; do
-            echo "                    <div class=\"finding-item medium\">" >> "$html"
-            echo "                        <p>${line}</p>" >> "$html"
-            echo "                    </div>" >> "$html"
-        done
-    else
-        echo "                    <p>No web vulnerabilities detected or scan not performed</p>" >> "$html"
-    fi
-
-    cat >> "$html" << 'HTML_WEB_END'
-                </div>
-            </details>
-        </div>
-HTML_WEB_END
-
-    # Section des services ouverts
-    cat >> "$html" << 'HTML_SERVICES'
-        <div class="section">
-            <h2>🔌 Open Services</h2>
-            <details>
-                <summary>View Detected Services</summary>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Service Information</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-HTML_SERVICES
-
-    if [ -f "$OUTDIR/network/nmap_services.txt" ]; then
-        grep "open" "$OUTDIR/network/nmap_services.txt" 2>/dev/null | head -20 | while IFS= read -r line; do
-            echo "                        <tr><td>${line}</td></tr>" >> "$html"
-        done
-    else
-        echo "                        <tr><td>No services detected or scan not performed</td></tr>" >> "$html"
-    fi
-
-    cat >> "$html" << 'HTML_SERVICES_END'
-                    </tbody>
-                </table>
-            </details>
-        </div>
-HTML_SERVICES_END
-
-    # Section des recommandations
-    cat >> "$html" << 'HTML_RECOMMENDATIONS'
-        <div class="section">
-            <h2>💡 Recommendations</h2>
-
-            <h3>Immediate Actions:</h3>
-            <div class="recommendation">
-                <strong>1. Patch Critical Vulnerabilities</strong>
-                <p>Address all identified critical vulnerabilities immediately to reduce attack surface.</p>
-            </div>
-
-            <div class="recommendation">
-                <strong>2. Disable Unnecessary Services</strong>
-                <p>Review and disable any services that are not essential for business operations.</p>
-            </div>
-
-            <div class="recommendation">
-                <strong>3. Implement Strong Authentication</strong>
-                <p>Enforce multi-factor authentication (MFA) for all critical systems and services.</p>
-            </div>
-
-            <div class="recommendation">
-                <strong>4. Deploy Network Segmentation</strong>
-                <p>Implement proper network segmentation to limit lateral movement in case of breach.</p>
-            </div>
-
-            <div class="recommendation">
-                <strong>5. Enable Comprehensive Logging</strong>
-                <p>Ensure all systems have proper logging enabled for incident detection and response.</p>
-            </div>
-
-            <h3>Red Team Next Steps:</h3>
-            <div class="code-block">
-# Review exploit scripts
-cd exploit/
-
-# Test default credentials
-cat credentials.txt
-
-# Run automated attacks (with authorization)
-./auto_attack.sh
-
-# Execute Metasploit modules
-cat msf_prep.txt
-            </div>
-        </div>
-HTML_RECOMMENDATIONS
-
-    # Section des fichiers générés
-    cat >> "$html" << HTML_FILES
-        <div class="section">
-            <h2>📁 Generated Files</h2>
-            <p><strong>Output Location:</strong> ${OUTDIR}</p>
-            <p><strong>Reports Directory:</strong> ${OUTDIR}/reports/</p>
-            <p><strong>Exploits Directory:</strong> ${OUTDIR}/exploit/</p>
-
-            <details>
-                <summary>View All Generated Files</summary>
-                <div class="code-block">
-HTML_FILES
-
-    find "$OUTDIR" -name "*.txt" -type f 2>/dev/null | head -30 | while IFS= read -r file; do
-        echo "$(basename "$file")<br>" >> "$html"
-    done
-
-    cat >> "$html" << 'HTML_FILES_END'
-                </div>
-            </details>
-        </div>
-HTML_FILES_END
-
-    # Footer
-    cat >> "$html" << HTML_FOOTER
-        <div class="footer">
-            <p><strong>Security Scanner v${VERSION}</strong></p>
-            <p>Report Generated: $(date '+%Y-%m-%d %H:%M:%S')</p>
-            <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
-                ⚠️ This tool is for authorized security testing only. Unauthorized use is illegal.
-            </p>
-        </div>
-    </div>
-</body>
-</html>
-HTML_FOOTER
-
-    if [ -f "$html" ] && [ -s "$html" ]; then
-        local html_size=$(stat -c%s "$html" 2>/dev/null || echo 0)
-        echo -e "${GREEN}[SUCCESS]${NC} HTML Report: ${WHITE}$html${NC} ${DIM}($html_size bytes)${NC}"
-        echo -e "${YELLOW}[INFO]${NC} Open in browser: ${WHITE}file://$PWD/$html${NC}"
+    # Call Python generator
+    python3 "$html_gen_script" "$OUTDIR" "$TARGET" "${URL:-NONE}" "${DOMAIN:-NONE}" "$scan_mode" 2>/dev/null
+
+    if [ $? -eq 0 ] && [ -f "$html" ] && [ -s "$html" ]; then
+        return 0
     else
         echo -e "${RED}[ERROR]${NC} HTML report generation failed"
+        return 1
     fi
 }
-
 main() {
     local AUTO_MODE=false
     
