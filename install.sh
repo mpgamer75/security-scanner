@@ -31,7 +31,7 @@ EOF
     echo -e "${NC}"
     echo "================================================================"
     echo -e "${WHITE}                      INSTALLATION SCRIPT${NC}"
-    echo -e "${CYAN}                         Version 2.3.2${NC}"
+    echo -e "${CYAN}                         Version 2.3.3${NC}"
     echo "================================================================"
     echo
 }
@@ -474,18 +474,25 @@ install_nuclei_templates() {
 
 install_scanner() {
     echo -e "${CYAN}[INFO]${NC} Installing Security Scanner..."
-    
+
     # Download the main script
     if ! curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/security -o security; then
         echo -e "${RED}[ERROR]${NC} Failed to download scanner script"
         exit 1
     fi
-    
+
+    # Download the HTML generator
+    if ! curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/html_generator.py -o html_generator.py; then
+        echo -e "${YELLOW}[WARNING]${NC} Failed to download HTML generator"
+        echo -e "${YELLOW}[INFO]${NC} HTML reports will not be available"
+    fi
+
     # Make executable
     chmod +x security
-    
+    chmod +x html_generator.py 2>/dev/null
+
     # Install globally
-    if sudo mv security /usr/local/bin/; then
+    if sudo mv security /usr/local/bin/ && sudo mv html_generator.py /usr/local/bin/ 2>/dev/null; then
         echo -e "${GREEN}[SUCCESS]${NC} Security Scanner installed successfully!"
         echo -e "${WHITE}You can now run:${NC} ${CYAN}security${NC}"
     else
@@ -538,6 +545,7 @@ main() {
     echo
     echo -e "${WHITE}Features installed:${NC}"
     echo -e "  ${GREEN}✓${NC} Security Scanner executable"
+    echo -e "  ${GREEN}✓${NC} HTML Report Generator (Python)"
     echo -e "  ${GREEN}✓${NC} Required security tools"
     echo -e "  ${GREEN}✓${NC} Wordlists for web scanning"
     if command -v nuclei &> /dev/null; then
