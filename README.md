@@ -229,7 +229,7 @@ redteam_20250106_143022/
 └── reports/
     ├── summary_report.txt          # Rapport texte complet
     ├── assessment.json             # Lisible machine
-    └── assessment.html             # Rapport HTML interactif ⭐ NOUVEAU
+    └── assessment.html             # Rapport HTML interactif - NOUVEAU
 ```
 
 ## Exemples d'Utilisation
@@ -433,8 +433,9 @@ which nmap subfinder nuclei
 
 ### Version 2.4.0 (Planifiée)
 
-- ✅ Exécution parallèle pour scans OSINT (Implémenté dans v2.3.3)
-- ✅ Export HTML professionnel (Implémenté dans v2.3.3)
+- [Implémenté v2.3.3] Exécution parallèle pour scans OSINT
+- [Implémenté v2.3.3] Export HTML professionnel avec design moderne
+- [Implémenté v2.3.3] Optimisations Nikto, Nuclei et SMB
 - Corrélation de vulnérabilités par apprentissage automatique
 - Tableau de bord web (monitoring temps réel)
 - Export PDF avec graphiques
@@ -498,7 +499,7 @@ Besoin d'aide?
 ---
 
 <p align="center">
-  <strong>Security Scanner v2.3.1</strong><br>
+  <strong>Security Scanner v2.3.3</strong><br>
   Outil Professionnel d'Évaluation Red Team<br>
   Rapide - Fiable - Complet
 </p>
