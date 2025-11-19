@@ -1219,41 +1219,49 @@ REPORT_HEADER_END
 
     # Vulns critiques trouvées
     if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-        count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         critical=$((critical + count))
     fi
     if [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ]; then
-        count=$(grep -ci "CRITICAL\|ms17-010\|EternalBlue" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "CRITICAL\|ms17-010\|EternalBlue" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         critical=$((critical + count))
     fi
     if [ -f "$OUTDIR/network/smb_enum.txt" ]; then
-        count=$(grep -ci "VULNERABLE" "$OUTDIR/network/smb_enum.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "VULNERABLE" "$OUTDIR/network/smb_enum.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         critical=$((critical + count))
     fi
 
     # Problèmes à risque élevé
     if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-        count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         high=$((high + count))
     fi
     if [ -f "$OUTDIR/web/nikto.txt" ]; then
-        count=$(grep -ci "high" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "high" "$OUTDIR/web/nikto.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         high=$((high + count))
     fi
 
     # Risques moyens
     if [ -f "$OUTDIR/network/nmap_vulns.txt" ]; then
-        count=$(grep -ci "medium\|warning" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "medium\|warning" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         medium=$((medium + count))
     fi
     if [ -f "$OUTDIR/web/nikto.txt" ]; then
-        count=$(grep -ci "medium\|warning" "$OUTDIR/web/nikto.txt" 2>/dev/null || echo 0)
+        count=$(grep -ci "medium\|warning" "$OUTDIR/web/nikto.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        count=${count:-0}
         medium=$((medium + count))
     fi
 
     # Items à faible risque (ports ouverts basiques)
     if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
-        low=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
+        low=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        low=${low:-0}
     fi
 
     # On affiche tout ça
@@ -1264,13 +1272,15 @@ REPORT_HEADER_END
 
     # Nombre de ports ouverts
     if [ -f "$OUTDIR/network/nmap_ports.txt" ]; then
-        ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
+        ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        ports=${ports:-0}
         echo "Open Ports: $ports" >> "$report"
     fi
 
     # Nombre de subdomains trouvés
     if [ -f "$OUTDIR/osint/all_subdomains.txt" ]; then
-        subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
+        subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        subs=${subs:-0}
         echo "Subdomains: $subs" >> "$report"
     fi
 
@@ -1421,19 +1431,19 @@ generate_json_report() {
         echo "  \"mode\": \"$([ "$QUICK_MODE" = true ] && echo "quick" || ([ "$STEALTH_MODE" = true ] && echo "stealth" || ([ "$AGGRESSIVE_MODE" = true ] && echo "aggressive" || echo "standard")))\","
         echo "  \"results\": {"
         echo "    \"osint\": {"
-        echo "      \"subdomains\": $([ -f "$OUTDIR/osint/all_subdomains.txt" ] && wc -l < "$OUTDIR/osint/all_subdomains.txt" || echo 0),"
-        echo "      \"emails\": $([ -f "$OUTDIR/osint/emails.txt" ] && grep -c "@" "$OUTDIR/osint/emails.txt" || echo 0)"
+        echo "      \"subdomains\": $([ -f "$OUTDIR/osint/all_subdomains.txt" ] && wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null | tr -d '\n' || echo "0"),"
+        echo "      \"emails\": $([ -f "$OUTDIR/osint/emails.txt" ] && grep -c "@" "$OUTDIR/osint/emails.txt" 2>/dev/null | tr -d '\n' || echo "0")"
         echo "    },"
         echo "    \"network\": {"
-        echo "      \"ports\": $([ -f "$OUTDIR/network/nmap_ports.txt" ] && grep -c "open" "$OUTDIR/network/nmap_ports.txt" || echo 0),"
-        echo "      \"vulns\": $([ -f "$OUTDIR/network/nmap_vulns.txt" ] && grep -c "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" || echo 0)"
+        echo "      \"ports\": $([ -f "$OUTDIR/network/nmap_ports.txt" ] && grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null | tr -d '\n' || echo "0"),"
+        echo "      \"vulns\": $([ -f "$OUTDIR/network/nmap_vulns.txt" ] && grep -c "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")"
         echo "    },"
         echo "    \"web\": {"
-        echo "      \"dirs\": $([ -f "$OUTDIR/web/gobuster_common.txt" ] && wc -l < "$OUTDIR/web/gobuster_common.txt" || echo 0),"
-        echo "      \"vulns\": $([ -f "$OUTDIR/web/nuclei.txt" ] && wc -l < "$OUTDIR/web/nuclei.txt" || echo 0)"
+        echo "      \"dirs\": $([ -f "$OUTDIR/web/gobuster_common.txt" ] && wc -l < "$OUTDIR/web/gobuster_common.txt" 2>/dev/null | tr -d '\n' || echo "0"),"
+        echo "      \"vulns\": $([ -f "$OUTDIR/web/nuclei.txt" ] && wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d '\n' || echo "0")"
         echo "    }"
         echo "  },"
-        echo "  \"files\": $(find "$OUTDIR" -type f 2>/dev/null | wc -l)"
+        echo "  \"files\": $(find "$OUTDIR" -type f 2>/dev/null | wc -l | tr -d '\n')"
         echo "}"
     } > "$json" 2>/dev/null
 
@@ -1456,11 +1466,16 @@ generate_html_report() {
     local ports=0
     local subs=0
 
-    [ -f "$OUTDIR/network/nmap_vulns.txt" ] && critical=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo 0)
-    [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ] && high=$(grep -ci "CRITICAL\|ms17-010" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null || echo 0)
-    [ -f "$OUTDIR/web/nuclei.txt" ] && medium=$(grep -ci "medium" "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
-    [ -f "$OUTDIR/network/nmap_ports.txt" ] && ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo 0)
-    [ -f "$OUTDIR/osint/all_subdomains.txt" ] && subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null || echo 0)
+    [ -f "$OUTDIR/network/nmap_vulns.txt" ] && critical=$(grep -ci "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
+    critical=${critical:-0}
+    [ -f "$OUTDIR/network/nmap_critical_vulns.txt" ] && high=$(grep -ci "CRITICAL\|ms17-010" "$OUTDIR/network/nmap_critical_vulns.txt" 2>/dev/null | tr -d '\n' || echo "0")
+    high=${high:-0}
+    [ -f "$OUTDIR/web/nuclei.txt" ] && medium=$(grep -ci "medium" "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d '\n' || echo "0")
+    medium=${medium:-0}
+    [ -f "$OUTDIR/network/nmap_ports.txt" ] && ports=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null | tr -d '\n' || echo "0")
+    ports=${ports:-0}
+    [ -f "$OUTDIR/osint/all_subdomains.txt" ] && subs=$(wc -l < "$OUTDIR/osint/all_subdomains.txt" 2>/dev/null | tr -d '\n' || echo "0")
+    subs=${subs:-0}
 
     local risk=$((critical * 10 + high * 5 + medium * 2))
     [ $risk -gt 100 ] && risk=100
