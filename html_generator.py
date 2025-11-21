@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 def generate_html_report(outdir, target, url, domain, scan_mode):
-    """Generate a modern, professional HTML report"""
+    """Generate a modern, professional HTML report with enhanced CSS and JavaScript"""
 
     # Read statistics from files
     stats = {
@@ -42,6 +42,8 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                     stats['high'] += content.lower().count('ms17-010')
                 elif key == 'nuclei':
                     stats['medium'] += content.lower().count('medium')
+                    stats['high'] += content.lower().count('[high]')
+                    stats['critical'] += content.lower().count('[critical]')
                 elif key == 'nmap_ports':
                     stats['ports'] = content.count('open')
                 elif key == 'subdomains':
@@ -75,14 +77,14 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             for line in f:
                 if 'VULNERABLE' in line.upper():
                     network_vulns.append(line.strip())
-                    if len(network_vulns) >= 20:
+                    if len(network_vulns) >= 50:
                         break
     except FileNotFoundError:
         pass
 
     try:
         with open(f'{outdir}/web/nuclei.txt', 'r') as f:
-            web_vulns = [line.strip() for line in f if line.strip()][:20]
+            web_vulns = [line.strip() for line in f if line.strip()][:50]
     except FileNotFoundError:
         pass
 
@@ -91,7 +93,7 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             for line in f:
                 if 'open' in line.lower():
                     services.append(line.strip())
-                    if len(services) >= 20:
+                    if len(services) >= 30:
                         break
     except FileNotFoundError:
         pass
@@ -103,18 +105,24 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Assessment Report - {target}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {{
             --bg-primary: #0a0e27;
             --bg-secondary: #0f1729;
+            --bg-tertiary: #1a1f3a;
             --bg-card: rgba(15, 23, 42, 0.8);
             --bg-glass: rgba(255, 255, 255, 0.05);
             --border-glass: rgba(255, 255, 255, 0.1);
             --accent-primary: #ef4444;
             --accent-secondary: #3b82f6;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
+            --text-dim: #64748b;
+            --shadow-glow-red: 0 0 30px rgba(239, 68, 68, 0.3);
+            --shadow-glow-blue: 0 0 30px rgba(59, 130, 246, 0.3);
         }}
 
         * {{
@@ -125,26 +133,62 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
 
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1f3a 50%, var(--bg-secondary) 100%);
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-tertiary) 50%, var(--bg-secondary) 100%);
             background-attachment: fixed;
             color: var(--text-primary);
             line-height: 1.6;
             padding: 20px;
             min-height: 100vh;
+            animation: fadeIn 0.6s ease-in;
+        }}
+
+        @keyframes fadeIn {{
+            from {{ opacity: 0; }}
+            to {{ opacity: 1; }}
+        }}
+
+        @keyframes slideUp {{
+            from {{
+                opacity: 0;
+                transform: translateY(30px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
+            }}
+        }}
+
+        @keyframes pulse {{
+            0%, 100% {{ transform: scale(1); }}
+            50% {{ transform: scale(1.05); }}
+        }}
+
+        @keyframes shimmer {{
+            0% {{ background-position: -1000px 0; }}
+            100% {{ background-position: 1000px 0; }}
         }}
 
         .container {{
             max-width: 1600px;
             margin: 0 auto;
+            animation: slideUp 0.8s ease-out;
         }}
 
         .glass-card {{
             background: var(--bg-glass);
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid var(--border-glass);
             border-radius: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+                        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
             overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }}
+
+        .glass-card:hover {{
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5),
+                        0 0 0 1px rgba(255, 255, 255, 0.08) inset;
         }}
 
         .header {{
@@ -152,25 +196,42 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             border-bottom: 1px solid rgba(239, 68, 68, 0.3);
             padding: 60px 40px;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+        }}
+
+        .header::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+            animation: shimmer 3s infinite;
         }}
 
         .header h1 {{
             font-size: clamp(2rem, 5vw, 3.5rem);
-            font-weight: 800;
+            font-weight: 900;
             margin-bottom: 12px;
             background: linear-gradient(135deg, #fff 0%, #ef4444 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            letter-spacing: -1px;
+            letter-spacing: -2px;
+            position: relative;
+            z-index: 1;
         }}
 
         .header .subtitle {{
             font-size: 1.25rem;
-            font-weight: 500;
+            font-weight: 600;
             color: var(--text-secondary);
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             text-transform: uppercase;
+            position: relative;
+            z-index: 1;
         }}
 
         .info-grid {{
@@ -186,20 +247,21 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             padding: 24px;
             border-radius: 16px;
             border: 1px solid var(--border-glass);
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: default;
         }}
 
         .info-card:hover {{
-            transform: translateY(-4px);
-            border-color: rgba(59, 130, 246, 0.3);
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+            transform: translateY(-4px) scale(1.02);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.2);
         }}
 
         .info-card h3 {{
             color: var(--accent-secondary);
             margin-bottom: 12px;
             font-size: 0.85rem;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1.5px;
         }}
@@ -209,6 +271,7 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             font-weight: 600;
             color: var(--text-primary);
             font-family: 'JetBrains Mono', monospace;
+            word-break: break-all;
         }}
 
         .stats-grid {{
@@ -225,7 +288,22 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             border-radius: 20px;
             text-align: center;
             border: 1px solid var(--border-glass);
-            transition: all 0.4s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: default;
+            position: relative;
+            overflow: hidden;
+        }}
+
+        .stat-card::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }}
 
         .stat-card:hover {{
@@ -233,11 +311,20 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
         }}
 
+        .stat-card:hover::before {{
+            opacity: 1;
+        }}
+
         .stat-card .number {{
             font-size: 4rem;
             font-weight: 800;
             margin-bottom: 12px;
             line-height: 1;
+            transition: transform 0.3s ease;
+        }}
+
+        .stat-card:hover .number {{
+            transform: scale(1.1);
         }}
 
         .stat-card .label {{
@@ -248,9 +335,13 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             color: var(--text-secondary);
         }}
 
-        .stat-card.critical .number {{ color: #ef4444; }}
-        .stat-card.high .number {{ color: #f59e0b; }}
+        .stat-card.critical {{ color: #ef4444; }}
+        .stat-card.critical .number {{ color: #ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }}
+        .stat-card.high {{ color: #f59e0b; }}
+        .stat-card.high .number {{ color: #f59e0b; text-shadow: 0 0 20px rgba(245, 158, 11, 0.5); }}
+        .stat-card.medium {{ color: #f59e0b; }}
         .stat-card.medium .number {{ color: #f59e0b; }}
+        .stat-card.info {{ color: #3b82f6; }}
         .stat-card.info .number {{ color: #3b82f6; }}
 
         .section {{
@@ -276,16 +367,35 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             border-radius: 2px;
         }}
 
+        .section h3 {{
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 32px 0 16px 0;
+            color: var(--accent-secondary);
+        }}
+
         .risk-badge {{
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
+            gap: 12px;
+            padding: 16px 32px;
             border-radius: 12px;
-            font-weight: 600;
-            font-size: 1.1rem;
+            font-weight: 700;
+            font-size: 1.2rem;
             margin: 16px 0;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            cursor: default;
+        }}
+
+        .risk-badge:hover {{
+            transform: scale(1.05);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }}
+
+        .risk-badge::before {{
+            content: '⚠';
+            font-size: 1.5rem;
         }}
 
         .accordion {{
@@ -295,6 +405,11 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             border-radius: 16px;
             margin: 20px 0;
             overflow: hidden;
+            transition: all 0.3s ease;
+        }}
+
+        .accordion:hover {{
+            border-color: rgba(59, 130, 246, 0.3);
         }}
 
         .accordion-header {{
@@ -307,20 +422,34 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             justify-content: space-between;
             align-items: center;
             transition: all 0.3s ease;
+            user-select: none;
         }}
 
         .accordion-header:hover {{
             background: rgba(59, 130, 246, 0.05);
         }}
 
+        .accordion-header:active {{
+            background: rgba(59, 130, 246, 0.1);
+        }}
+
+        .accordion-arrow {{
+            transition: transform 0.3s ease;
+            font-size: 1.2rem;
+        }}
+
+        .accordion.active .accordion-arrow {{
+            transform: rotate(180deg);
+        }}
+
         .accordion-content {{
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.4s ease;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }}
 
         .accordion.active .accordion-content {{
-            max-height: 2000px;
+            max-height: 3000px;
         }}
 
         .findings-list {{
@@ -337,11 +466,13 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
             transition: all 0.2s ease;
+            cursor: default;
         }}
 
         .finding-item:hover {{
-            background: rgba(239, 68, 68, 0.05);
-            transform: translateX(4px);
+            background: rgba(239, 68, 68, 0.1);
+            transform: translateX(8px);
+            border-left-width: 5px;
         }}
 
         .code-block {{
@@ -353,6 +484,12 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             overflow-x: auto;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }}
+
+        .code-block:hover {{
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 1px #58a6ff;
         }}
 
         .recommendation {{
@@ -361,12 +498,19 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             padding: 20px;
             margin: 16px 0;
             border-radius: 12px;
+            transition: all 0.3s ease;
+        }}
+
+        .recommendation:hover {{
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.08));
+            transform: translateX(4px);
         }}
 
         .recommendation strong {{
             color: var(--accent-secondary);
             display: block;
             margin-bottom: 8px;
+            font-size: 1.1rem;
         }}
 
         table {{
@@ -390,10 +534,19 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             text-transform: uppercase;
             font-size: 0.85rem;
             color: var(--accent-primary);
+            letter-spacing: 1px;
+        }}
+
+        tr {{
+            transition: background 0.2s ease;
         }}
 
         tr:hover {{
             background: rgba(59, 130, 246, 0.05);
+        }}
+
+        tbody tr:last-child td {{
+            border-bottom: none;
         }}
 
         .footer {{
@@ -404,13 +557,70 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             color: var(--text-secondary);
         }}
 
+        .footer p {{
+            margin: 8px 0;
+        }}
+
+        .scroll-top {{
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }}
+
+        .scroll-top:hover {{
+            background: #dc2626;
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.6);
+        }}
+
+        .scroll-top.visible {{
+            display: flex;
+        }}
+
         @media (max-width: 768px) {{
             .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
             .info-grid {{ grid-template-columns: 1fr; }}
+            .header {{ padding: 40px 20px; }}
+            .section {{ padding: 20px; }}
+            .stat-card .number {{ font-size: 3rem; }}
+        }}
+
+        /* Print styles */
+        @media print {{
+            body {{
+                background: white;
+                color: black;
+            }}
+            .glass-card {{
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }}
+            .scroll-top {{
+                display: none !important;
+            }}
+            .accordion-content {{
+                max-height: none !important;
+            }}
         }}
     </style>
 </head>
 <body>
+    <button class="scroll-top" id="scrollTop" aria-label="Scroll to top">↑</button>
+
     <div class="container">
         <div class="glass-card">
             <div class="header">
@@ -423,8 +633,8 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                     <h3>Target</h3>
                     <p>{target}</p>
                 </div>
-                {f'<div class="info-card"><h3>URL</h3><p>{url}</p></div>' if url else ''}
-                {f'<div class="info-card"><h3>Domain</h3><p>{domain}</p></div>' if domain else ''}
+                {f'<div class="info-card"><h3>URL</h3><p>{url}</p></div>' if url and url != 'NONE' else ''}
+                {f'<div class="info-card"><h3>Domain</h3><p>{domain}</p></div>' if domain and domain != 'NONE' else ''}
                 <div class="info-card">
                     <h3>Assessment Date</h3>
                     <p>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
@@ -472,10 +682,10 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
 
             <div class="section">
                 <h2>Network Vulnerabilities</h2>
-                <div class="accordion active" onclick="this.classList.toggle('active')">
+                <div class="accordion active" data-accordion="network">
                     <div class="accordion-header">
-                        View Network Findings
-                        <span>▼</span>
+                        <span>View Network Findings ({len(network_vulns)} issues)</span>
+                        <span class="accordion-arrow">▼</span>
                     </div>
                     <div class="accordion-content">
                         <div class="findings-list">
@@ -487,10 +697,10 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
 
             <div class="section">
                 <h2>Web Application Vulnerabilities</h2>
-                <div class="accordion active" onclick="this.classList.toggle('active')">
+                <div class="accordion active" data-accordion="web">
                     <div class="accordion-header">
-                        View Web Findings
-                        <span>▼</span>
+                        <span>View Web Findings ({len(web_vulns)} issues)</span>
+                        <span class="accordion-arrow">▼</span>
                     </div>
                     <div class="accordion-content">
                         <div class="findings-list">
@@ -502,10 +712,10 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
 
             <div class="section">
                 <h2>Open Services</h2>
-                <div class="accordion active" onclick="this.classList.toggle('active')">
+                <div class="accordion active" data-accordion="services">
                     <div class="accordion-header">
-                        View Detected Services
-                        <span>▼</span>
+                        <span>View Detected Services ({len(services)} services)</span>
+                        <span class="accordion-arrow">▼</span>
                     </div>
                     <div class="accordion-content">
                         <table>
@@ -567,6 +777,91 @@ cat msf_prep.txt
             </div>
         </div>
     </div>
+
+    <script>
+        // Accordion functionality
+        document.querySelectorAll('.accordion').forEach(accordion => {{
+            const header = accordion.querySelector('.accordion-header');
+            header.addEventListener('click', () => {{
+                accordion.classList.toggle('active');
+            }});
+        }});
+
+        // Scroll to top button
+        const scrollTopBtn = document.getElementById('scrollTop');
+
+        window.addEventListener('scroll', () => {{
+            if (window.pageYOffset > 300) {{
+                scrollTopBtn.classList.add('visible');
+            }} else {{
+                scrollTopBtn.classList.remove('visible');
+            }}
+        }});
+
+        scrollTopBtn.addEventListener('click', () => {{
+            window.scrollTo({{
+                top: 0,
+                behavior: 'smooth'
+            }});
+        }});
+
+        // Animate stats on scroll
+        const animateStats = () => {{
+            const statCards = document.querySelectorAll('.stat-card .number');
+            const observer = new IntersectionObserver((entries) => {{
+                entries.forEach(entry => {{
+                    if (entry.isIntersecting) {{
+                        const target = parseInt(entry.target.textContent);
+                        animateNumber(entry.target, target);
+                        observer.unobserve(entry.target);
+                    }}
+                }});
+            }}, {{ threshold: 0.5 }});
+
+            statCards.forEach(card => observer.observe(card));
+        }};
+
+        const animateNumber = (element, target) => {{
+            let current = 0;
+            const increment = target / 50;
+            const timer = setInterval(() => {{
+                current += increment;
+                if (current >= target) {{
+                    element.textContent = target;
+                    clearInterval(timer);
+                }} else {{
+                    element.textContent = Math.floor(current);
+                }}
+            }}, 20);
+        }};
+
+        // Initialize animations
+        if ('IntersectionObserver' in window) {{
+            animateStats();
+        }}
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {{
+            // Press 'T' to scroll to top
+            if (e.key === 't' || e.key === 'T') {{
+                window.scrollTo({{ top: 0, behavior: 'smooth' }});
+            }}
+            // Press 'E' to expand/collapse all accordions
+            if (e.key === 'e' || e.key === 'E') {{
+                document.querySelectorAll('.accordion').forEach(acc => {{
+                    acc.classList.toggle('active');
+                }});
+            }}
+        }});
+
+        // Add tooltips for stats
+        document.querySelectorAll('.stat-card').forEach(card => {{
+            card.setAttribute('title', 'Click to highlight related findings');
+        }});
+
+        console.log('%c Security Assessment Report Loaded ', 'background: #ef4444; color: white; font-size: 16px; padding: 10px;');
+        console.log('%c Keyboard Shortcuts: T = Scroll to top | E = Expand/Collapse all ', 'color: #3b82f6; font-size: 12px;');
+    </script>
 </body>
 </html>'''
 
@@ -575,7 +870,7 @@ cat msf_prep.txt
 def _generate_findings(findings, empty_message):
     """Generate HTML for findings list"""
     if not findings:
-        return f'<p>{empty_message}</p>'
+        return f'<p style="color: var(--text-secondary); font-style: italic;">{empty_message}</p>'
 
     html = ''
     for finding in findings:
@@ -585,7 +880,7 @@ def _generate_findings(findings, empty_message):
 def _generate_services(services):
     """Generate HTML for services table"""
     if not services:
-        return '<tr><td>No services detected or scan not performed</td></tr>'
+        return '<tr><td style="color: var(--text-secondary); font-style: italic;">No services detected or scan not performed</td></tr>'
 
     html = ''
     for service in services:
