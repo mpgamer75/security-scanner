@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Security Scanner HTML Report Generator v2.0
 Professional, corporate-grade HTML report with modern UX/UI
@@ -862,17 +863,17 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                 </div>
             </div>
 
-            {f'''<div class="section">
+            {"""<div class="section">
                 <div class="section-header">
                     <h2 class="section-title">
-                        <span class="section-icon">⚠️</span>
+                        <span class="section-icon">&#9888;</span>
                         Critical Services Detected
                     </h2>
                 </div>
                 <div class="findings-grid">
                     {_generate_findings(critical_services[:10], None, "critical")}
                 </div>
-            </div>''' if critical_services else ''}
+            </div>""" if critical_services else ''}
         </div>
 
         <!-- Tab: Network -->
