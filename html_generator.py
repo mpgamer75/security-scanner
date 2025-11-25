@@ -190,11 +190,6 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             }}
         }}
 
-        @keyframes pulse {{
-            0%, 100% {{ opacity: 1; }}
-            50% {{ opacity: 0.8; }}
-        }}
-
         @keyframes shimmer {{
             0% {{ background-position: -1000px 0; }}
             100% {{ background-position: 1000px 0; }}
@@ -750,14 +745,6 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                 page-break-inside: avoid;
             }}
         }}
-
-        /* Loading Skeleton */
-        .skeleton {{
-            background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-elevated-hover) 50%, var(--bg-elevated) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 8px;
-        }}
     </style>
 </head>
 <body>
@@ -1141,18 +1128,6 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             }}
         }});
 
-        // Print functionality
-        window.printReport = () => {{
-            window.print();
-        }};
-
-        // Copy to clipboard
-        window.copyToClipboard = (text) => {{
-            navigator.clipboard.writeText(text).then(() => {{
-                alert('Copied to clipboard!');
-            }});
-        }};
-
         // Console easter egg
         console.log('%c Security Report Loaded ', 'background: #ff6b35; color: white; font-size: 16px; padding: 10px; font-weight: bold;');
         console.log('%c Keyboard Shortcuts: T = Top | 1-5 = Tab Navigation ', 'color: #00d4ff; font-size: 12px;');
@@ -1246,4 +1221,6 @@ if __name__ == '__main__':
         print(f"[INFO] Open in browser: file://{Path(output_file).absolute()}")
     except Exception as e:
         print(f"[ERROR] Failed to generate HTML report: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
