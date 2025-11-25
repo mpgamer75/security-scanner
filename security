@@ -1581,13 +1581,33 @@ generate_json_report() {
 
 generate_html_report() {
     local html="$OUTDIR/reports/assessment.html"
-    local html_gen_script="$(dirname "$0")/html_generator.py"
+    local html_gen_script=""
 
     echo -e "${CYAN}[REPORT]${NC} Generating HTML report..."
 
+    # Try to locate html_generator.py in multiple locations
+    local search_paths=(
+        "$(dirname "$0")/html_generator.py"
+        "/usr/local/bin/html_generator.py"
+        "$HOME/.local/bin/html_generator.py"
+        "./html_generator.py"
+        "$(pwd)/html_generator.py"
+    )
+
+    for path in "${search_paths[@]}"; do
+        if [ -f "$path" ]; then
+            html_gen_script="$path"
+            echo -e "${GREEN}[FOUND]${NC} HTML generator at: $html_gen_script"
+            break
+        fi
+    done
+
     # Check if Python generator exists
-    if [ ! -f "$html_gen_script" ]; then
-        echo -e "${YELLOW}[WARN]${NC} HTML generator not found at $html_gen_script"
+    if [ -z "$html_gen_script" ] || [ ! -f "$html_gen_script" ]; then
+        echo -e "${YELLOW}[WARN]${NC} HTML generator not found in any of these locations:"
+        for path in "${search_paths[@]}"; do
+            echo -e "${DIM}  - $path${NC}"
+        done
         echo -e "${YELLOW}[INFO]${NC} Skipping HTML generation"
         return 1
     fi
@@ -1598,13 +1618,20 @@ generate_html_report() {
     [ "$STEALTH_MODE" = true ] && scan_mode="Stealth (IDS/IPS evasion)"
     [ "$AGGRESSIVE_MODE" = true ] && scan_mode="Aggressive (full coverage)"
 
-    # Call Python generator
-    python3 "$html_gen_script" "$OUTDIR" "$TARGET" "${URL:-NONE}" "${DOMAIN:-NONE}" "$scan_mode" 2>/dev/null
+    # Call Python generator - REMOVED 2>/dev/null to show errors
+    echo -e "${CYAN}[INFO]${NC} Executing: python3 $html_gen_script $OUTDIR $TARGET ${URL:-NONE} ${DOMAIN:-NONE} \"$scan_mode\""
+    python3 "$html_gen_script" "$OUTDIR" "$TARGET" "${URL:-NONE}" "${DOMAIN:-NONE}" "$scan_mode"
+    local exit_code=$?
 
-    if [ $? -eq 0 ] && [ -f "$html" ] && [ -s "$html" ]; then
+    if [ $exit_code -eq 0 ] && [ -f "$html" ] && [ -s "$html" ]; then
+        local html_size=$(stat -c%s "$html" 2>/dev/null || echo "0")
+        echo -e "${GREEN}[SUCCESS]${NC} HTML Report: ${WHITE}$html${NC} ${DIM}($html_size bytes)${NC}"
+        echo -e "${GREEN}[INFO]${NC} Open in browser: ${WHITE}file://$(readlink -f "$html")${NC}"
         return 0
     else
-        echo -e "${RED}[ERROR]${NC} HTML report generation failed"
+        echo -e "${RED}[ERROR]${NC} HTML report generation failed (exit code: $exit_code)"
+        [ ! -f "$html" ] && echo -e "${RED}[ERROR]${NC} Output file not created: $html"
+        [ -f "$html" ] && [ ! -s "$html" ] && echo -e "${RED}[ERROR]${NC} Output file is empty: $html"
         return 1
     fi
 }
