@@ -40,12 +40,12 @@ QUICK_MODE=false
 STEALTH_MODE=false
 AGGRESSIVE_MODE=false
 
-# Timeouts ajustés - j'ai réduit de 60% pour que ce soit plus rapide
+# Timeouts ajustés - optimisés pour fiabilité et performance
 TIMEOUT_VERY_SHORT=15
 TIMEOUT_SHORT=30
 TIMEOUT_MEDIUM=120
-TIMEOUT_LONG=300
-TIMEOUT_VERY_LONG=600
+TIMEOUT_LONG=900        # 15 min - aligné avec nmap --host-timeout 15m
+TIMEOUT_VERY_LONG=1200  # 20 min - pour scans de vulnérabilités complexes
 
 display_banner() {
     clear
@@ -524,16 +524,20 @@ run_network_scans() {
     # Scan de ports principal - optimisé avec -Pn toujours activé
     execute_scan "Port Scanning (TCP SYN)" \
         "nmap -Pn -sS $nmap_timing $port_range $min_rate $max_retries \
-         $host_timeout --defeat-rst-ratelimit '$target' 2>/dev/null" \
+         $host_timeout --defeat-rst-ratelimit '$target'" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_ports.txt" true
     
     # Détection des services et versions qui tournent - version intensity augmentée
     local service_timeout=$TIMEOUT_LONG
-    [ "$QUICK_MODE" = true ] && service_timeout=$TIMEOUT_MEDIUM
-    
+    local service_host_timeout="15m"
+    if [ "$QUICK_MODE" = true ]; then
+        service_timeout=$TIMEOUT_MEDIUM
+        service_host_timeout="2m"  # Aligné avec TIMEOUT_MEDIUM (120s)
+    fi
+
     execute_scan "Service Version Detection" \
         "nmap -Pn -sV -sC $nmap_timing --top-ports 1000 --version-intensity 7 \
-         --version-all $max_retries --host-timeout 15m '$target' 2>/dev/null" \
+         --version-all $max_retries --host-timeout $service_host_timeout '$target'" \
         $service_timeout "$OUTDIR/network/nmap_services.txt"
     
     # Scan UDP sur les ports critiques uniquement (c'est lent l'UDP)
@@ -553,13 +557,13 @@ run_network_scans() {
     # Scan de vulns avec les scripts NSE - coverage étendu
     execute_scan "Vulnerability Detection (NSE)" \
         "nmap -Pn -sV --script 'vuln and not dos' --script-timeout 120s \
-         --top-ports 1000 $max_retries --host-timeout 15m '$target' 2>/dev/null" \
-        $TIMEOUT_LONG "$OUTDIR/network/nmap_vulns.txt"
+         --top-ports 1000 $max_retries --host-timeout 15m '$target'" \
+        $TIMEOUT_VERY_LONG "$OUTDIR/network/nmap_vulns.txt"
     
     # Scripts NSE pour les vulns critiques (SMB, SSL, HTTP, FTP, SSH)
     execute_scan "Critical Vulnerability Scan" \
         "nmap -Pn --script 'smb-vuln-*,ssl-*,http-vuln-*,ftp-vuln-*,ssh-*' --script-timeout 90s \
-         --script-args unsafe=1 --host-timeout 12m '$target' 2>/dev/null" \
+         --script-args unsafe=1 --host-timeout 12m '$target'" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_critical_vulns.txt"
     
     # Enum SMB complète - optimisée pour performance
