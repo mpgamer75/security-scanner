@@ -27,7 +27,7 @@ DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-VERSION="2.3.3"
+VERSION="2.3.4"
 
 # Vars globales du script
 SCAN_INTERRUPTED=false
