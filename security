@@ -1527,7 +1527,15 @@ REPORT_HEADER_END
         echo -e "${YELLOW}[INFO]${NC} Use 'less $report' or 'cat $report' to view complete report"
 
         generate_json_report
-        generate_html_report
+
+        # Generate HTML report with explicit output
+        echo -e "\n${CYAN}[STARTING]${NC} HTML report generation..."
+        if generate_html_report; then
+            echo -e "${GREEN}[COMPLETED]${NC} HTML report generation successful"
+        else
+            echo -e "${RED}[FAILED]${NC} HTML report generation failed"
+        fi
+
         return 0
     else
         echo -e "${RED}[ERROR]${NC} Report generation failed"
