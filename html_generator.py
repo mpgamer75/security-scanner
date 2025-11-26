@@ -1033,7 +1033,7 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
 
         <!-- Footer -->
         <footer class="footer">
-            <p><strong>Security Scanner v2.3.3</strong></p>
+            <p><strong>Security Scanner v2.3.4</strong></p>
             <p>Report Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
             <p style="margin-top: 16px; color: var(--text-tertiary);">
                 This tool is for authorized security testing only. Unauthorized use is illegal.
