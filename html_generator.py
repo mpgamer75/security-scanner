@@ -86,14 +86,10 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
     try:
         with open(f'{outdir}/network/nmap_vulns.txt', 'r', encoding='utf-8', errors='ignore') as f:
             for line in f:
-                line_upper = line.upper()
-                # Filter only relevant vulnerability lines
-                if any(keyword in line_upper for keyword in ['VULNERABLE', 'CVE-', 'EXPLOIT', 'CRITICAL', 'HIGH']):
-                    # Ignore scanning/info lines
-                    if not any(ignore in line_upper for ignore in ['SCANNING', 'STARTING', 'NSE:', 'SCRIPT']):
-                        network_vulns.append(line.strip())
-                        if len(network_vulns) >= 50:  # Reduced from 100 for better relevance
-                            break
+                if 'VULNERABLE' in line.upper() or 'CVE-' in line.upper():
+                    network_vulns.append(line.strip())
+                    if len(network_vulns) >= 100:
+                        break
     except FileNotFoundError:
         pass
 
