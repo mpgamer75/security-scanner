@@ -86,8 +86,27 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
     try:
         with open(f'{outdir}/network/nmap_vulns.txt', 'r', encoding='utf-8', errors='ignore') as f:
             for line in f:
-                if 'VULNERABLE' in line.upper() or 'CVE-' in line.upper():
-                    network_vulns.append(line.strip())
+                line_stripped = line.strip()
+                if not line_stripped:  # Skip empty lines
+                    continue
+
+                line_upper = line_stripped.upper()
+
+                # Keywords that indicate actual vulnerabilities
+                vuln_keywords = ['VULNERABLE', 'CVE-', 'EXPLOIT', 'CRITICAL', 'HIGH RISK', 'SEVERITY']
+
+                # Keywords that indicate scan status/noise (not vulnerabilities)
+                noise_keywords = ['SCANNING', 'STARTING', 'NSE:', 'SCRIPT EXECUTION', 'ATTEMPTING', 'TRYING', 'CHECKING']
+
+                # Check if line contains vulnerability keywords
+                has_vuln_keyword = any(keyword in line_upper for keyword in vuln_keywords)
+
+                # Check if line is just noise
+                is_noise = any(noise in line_upper for noise in noise_keywords)
+
+                # Keep line if it has vulnerability keywords AND is not noise
+                if has_vuln_keyword and not is_noise:
+                    network_vulns.append(line_stripped)
                     if len(network_vulns) >= 100:
                         break
     except FileNotFoundError:
@@ -111,6 +130,21 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                         break
     except FileNotFoundError:
         pass
+
+    # Generate Critical Services section before main HTML to avoid f-string nesting issues
+    critical_services_html = ''
+    if critical_services:
+        critical_services_html = f'''<div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span class="section-icon">&#9888;</span>
+                        Critical Services Detected
+                    </h2>
+                </div>
+                <div class="findings-grid">
+                    {_generate_findings(critical_services[:10], None, "critical")}
+                </div>
+            </div>'''
 
     # Generate HTML with professional design
     html = f'''<!DOCTYPE html>
@@ -863,17 +897,7 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                 </div>
             </div>
 
-            {"""<div class="section">
-                <div class="section-header">
-                    <h2 class="section-title">
-                        <span class="section-icon">&#9888;</span>
-                        Critical Services Detected
-                    </h2>
-                </div>
-                <div class="findings-grid">
-                    {_generate_findings(critical_services[:10], None, "critical")}
-                </div>
-            </div>""" if critical_services else ''}
+            {critical_services_html}
         </div>
 
         <!-- Tab: Network -->
