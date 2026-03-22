@@ -1,13 +1,11 @@
 #!/bin/bash
 
-# Couleurs pour l'affichage
+# Terminal color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
-GRAY='\033[0;90m'
 NC='\033[0m'
 
 display_install_banner() {
@@ -59,7 +57,7 @@ check_system() {
 install_tools() {
     echo -e "${CYAN}[INFO]${NC} Checking required tools..."
     
-    # MISE À JOUR: Liste complète des outils utilisés dans le scanner v2.3.0
+    # Full list of tools used by the scanner
     local tools=(nmap masscan gobuster sqlmap whois nikto whatweb dig openssl curl wget git python3-pip nc netcat enum4linux smbclient sslscan hydra)
     local missing=()
     
@@ -86,7 +84,7 @@ install_tools() {
     
     if command -v apt &> /dev/null; then
         sudo apt update
-        # Installation des outils système
+        # Install system tools
         sudo apt install -y nmap masscan gobuster sqlmap whois nikto whatweb dnsutils openssl curl wget git python3-pip netcat-traditional enum4linux smbclient sslscan hydra 2>/dev/null || {
             echo -e "${YELLOW}[WARNING]${NC} Some packages may not be available, continuing..."
         }
@@ -103,46 +101,50 @@ install_tools() {
     fi
     
     # Install Go tools if Go is available
+    # Pinned Go tool versions for reproducible installs
+    SUBFINDER_VERSION="v2.6.6"
+    NUCLEI_VERSION="v3.2.4"
+    ASSETFINDER_VERSION="v0.1.1"
+
     if command -v go &> /dev/null; then
-        echo -e "${CYAN}[INFO]${NC} Installing Go-based tools..."
-        
+        echo -e "${CYAN}[INFO]${NC} Installing Go-based tools (pinned versions)..."
+
         if ! command -v subfinder &> /dev/null; then
-            echo -e "${CYAN}[INFO]${NC} Installing subfinder..."
-            go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest 2>/dev/null || {
+            echo -e "${CYAN}[INFO]${NC} Installing subfinder ${SUBFINDER_VERSION}..."
+            go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@${SUBFINDER_VERSION} 2>/dev/null || {
                 echo -e "${YELLOW}[WARNING]${NC} Subfinder installation failed"
             }
         fi
-        
+
         if ! command -v nuclei &> /dev/null; then
-            echo -e "${CYAN}[INFO]${NC} Installing nuclei..."
-            go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest 2>/dev/null || {
+            echo -e "${CYAN}[INFO]${NC} Installing nuclei ${NUCLEI_VERSION}..."
+            go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@${NUCLEI_VERSION} 2>/dev/null || {
                 echo -e "${YELLOW}[WARNING]${NC} Nuclei installation failed"
             }
         fi
-        
-        
+
         if ! command -v assetfinder &> /dev/null; then
-            echo -e "${CYAN}[INFO]${NC} Installing assetfinder..."
-            go install -v github.com/tomnomnom/assetfinder@latest 2>/dev/null || {
+            echo -e "${CYAN}[INFO]${NC} Installing assetfinder ${ASSETFINDER_VERSION}..."
+            go install -v github.com/tomnomnom/assetfinder@${ASSETFINDER_VERSION} 2>/dev/null || {
                 echo -e "${YELLOW}[WARNING]${NC} Assetfinder installation failed"
             }
         fi
         
         if ! command -v findomain &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing findomain..."
-            # Findomain nécessite une installation différente
-            wget -q https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux -O /tmp/findomain 2>/dev/null && {
+            # Findomain requires a direct binary download
+            if wget -q https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux -O /tmp/findomain 2>/dev/null; then
                 sudo mv /tmp/findomain /usr/local/bin/findomain
                 sudo chmod +x /usr/local/bin/findomain
                 echo -e "${GREEN}[OK]${NC} Findomain installed"
-            } || {
+            else
                 echo -e "${YELLOW}[WARNING]${NC} Findomain installation failed"
-            }
+            fi
         fi
         
         if ! command -v rustscan &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing rustscan..."
-            # RustScan installation via cargo ou binaire
+            # RustScan installation via cargo or binary
             if command -v cargo &> /dev/null; then
                 cargo install rustscan 2>/dev/null || {
                     echo -e "${YELLOW}[WARNING]${NC} RustScan installation failed"
@@ -204,7 +206,7 @@ install_wordlists() {
     local wordlist_dir="/usr/share/wordlists/dirb"
     local use_sudo=true
     
-    # Vérifier si on peut écrire dans /usr/share/wordlists
+    # Check if we can write to /usr/share/wordlists
     if [ ! -d "$wordlist_dir" ]; then
         if ! sudo mkdir -p "$wordlist_dir" 2>/dev/null; then
             wordlist_dir="$HOME/.local/share/wordlists/dirb"
@@ -214,10 +216,12 @@ install_wordlists() {
         fi
     fi
     
-    # Vérifier si les wordlists existent déjà
+    # Check if wordlists already exist
     if [ -f "$wordlist_dir/common.txt" ] && [ -f "$wordlist_dir/big.txt" ]; then
-        local common_size=$(stat -c%s "$wordlist_dir/common.txt" 2>/dev/null || stat -f%z "$wordlist_dir/common.txt" 2>/dev/null || echo "0")
-        local big_size=$(stat -c%s "$wordlist_dir/big.txt" 2>/dev/null || stat -f%z "$wordlist_dir/big.txt" 2>/dev/null || echo "0")
+        local common_size
+        common_size=$(stat -c%s "$wordlist_dir/common.txt" 2>/dev/null || stat -f%z "$wordlist_dir/common.txt" 2>/dev/null || echo "0")
+        local big_size
+        big_size=$(stat -c%s "$wordlist_dir/big.txt" 2>/dev/null || stat -f%z "$wordlist_dir/big.txt" 2>/dev/null || echo "0")
         
         if [ "$common_size" -gt 1000 ] && [ "$big_size" -gt 5000 ]; then
             echo -e "${GREEN}[OK]${NC} Wordlists already available"
@@ -234,7 +238,7 @@ install_wordlists() {
     
     echo -e "${CYAN}[INFO]${NC} Downloading wordlists..."
     
-    # Sources de wordlists (ordre de préférence)
+    # Wordlist sources (in order of preference)
     local common_sources=(
         "https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt"
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt"
@@ -247,7 +251,7 @@ install_wordlists() {
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/directory-list-2.3-medium.txt"
     )
     
-    # Télécharger common.txt
+    # Download common.txt
     local downloaded=false
     for url in "${common_sources[@]}"; do
         echo -e "${CYAN}[INFO]${NC} Trying to download common.txt from $(echo $url | cut -d'/' -f3)..."
@@ -263,7 +267,7 @@ install_wordlists() {
         create_minimal_common "$wordlist_dir/common.txt" "$use_sudo"
     fi
     
-    # Télécharger big.txt
+    # Download big.txt
     downloaded=false
     for url in "${big_sources[@]}"; do
         echo -e "${CYAN}[INFO]${NC} Trying to download big.txt from $(echo $url | cut -d'/' -f3)..."
@@ -461,8 +465,7 @@ install_nuclei_templates() {
     
     if command -v nuclei &> /dev/null; then
         echo -e "${CYAN}[INFO]${NC} Updating Nuclei templates..."
-        nuclei -update-templates &> /dev/null
-        if [ $? -eq 0 ]; then
+        if nuclei -update-templates &> /dev/null; then
             echo -e "${GREEN}[OK]${NC} Nuclei templates updated"
         else
             echo -e "${YELLOW}[WARNING]${NC} Failed to update Nuclei templates automatically"

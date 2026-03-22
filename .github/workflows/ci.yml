@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, "claude/**" ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+      - name: Run ShellCheck on security
+        run: shellcheck -e SC2086,SC2046 security
+      - name: Run ShellCheck on install.sh
+        run: shellcheck -e SC2086,SC2046 install.sh
+      - name: Run ShellCheck on lib modules
+        run: |
+          for f in lib/*.sh; do
+            echo "Checking $f..."
+            shellcheck -e SC2086,SC2046,SC2034,SC2154 "$f"
+          done
+
+  pylint:
+    name: Pylint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pylint
+        run: pip install pylint
+      - name: Run pylint on html_generator.py
+        run: pylint html_generator.py --fail-under=7.0 --disable=C0301,C0114,R0914
+
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Python unit tests
+        run: python3 -m pytest tests/ -v || python3 -m unittest discover -s tests/ -v
+
+  smoke-test:
+    name: Smoke Test (HTML Report)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Create dummy scan output
+        run: |
+          mkdir -p /tmp/test_scan/{osint,network,web,exploit,reports}
+          echo "PORT   STATE SERVICE" > /tmp/test_scan/network/nmap_ports.txt
+          echo "22/tcp open  ssh" >> /tmp/test_scan/network/nmap_ports.txt
+          echo "80/tcp open  http" >> /tmp/test_scan/network/nmap_ports.txt
+          echo "test.example.com" > /tmp/test_scan/osint/all_subdomains.txt
+          echo "api.example.com" >> /tmp/test_scan/osint/all_subdomains.txt
+      - name: Generate HTML report
+        run: |
+          python3 html_generator.py /tmp/test_scan test.example.com http://test.example.com test.example.com standard
+      - name: Verify HTML output exists and is non-empty
+        run: |
+          test -f /tmp/test_scan/reports/assessment.html
+          test -s /tmp/test_scan/reports/assessment.html
+          echo "HTML report generated successfully ($(wc -c < /tmp/test_scan/reports/assessment.html) bytes)"
+      - name: Check for XSS escaping
+        run: |
+          python3 html_generator.py /tmp/test_xss '<script>alert(1)</script>' NONE NONE standard
+          if grep -q '<script>alert(1)</script>' /tmp/test_xss/reports/assessment.html; then
+            echo "XSS VULNERABILITY DETECTED - unescaped HTML found!"
+            exit 1
+          fi
+          echo "XSS escaping verified OK"
+        env:
+          OUTDIR: /tmp/test_xss
+
+  security-scan:
+    name: Security Scan (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install bandit
+        run: pip install bandit
+      - name: Run bandit security scan
+        run: bandit html_generator.py -ll --skip B101

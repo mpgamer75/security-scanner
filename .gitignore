@@ -12,6 +12,8 @@ build/
 assessments/
 scans/
 results_*/
+redteam_*/
+security_scan_*/
 
 # OS
 .DS_Store
