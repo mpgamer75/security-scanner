@@ -397,8 +397,13 @@ _source_module() {
             return 0
         fi
     done
-    log_error "Module not found: $module"
-    return 1
+    echo -e "${RED}[ERROR]${NC} Module not found: $module"
+    echo -e "${YELLOW}[INFO]${NC}  Searched in:"
+    for path in "${search_paths[@]}"; do
+        echo -e "         - $path"
+    done
+    echo -e "${YELLOW}[FIX]${NC}  Run install.sh again or copy lib/ next to the security script"
+    exit 1
 }
 
 _source_module "osint.sh"
