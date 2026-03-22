@@ -53,6 +53,7 @@ WORKDIR /scanner
 # Copy scanner files
 COPY security /usr/local/bin/security
 COPY html_generator.py /usr/local/bin/html_generator.py
+COPY lib/ /usr/local/bin/lib/
 
 # Make scripts executable
 RUN chmod +x /usr/local/bin/security
