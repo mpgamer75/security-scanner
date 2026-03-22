@@ -29,7 +29,7 @@ EOF
     echo -e "${NC}"
     echo "================================================================"
     echo -e "${WHITE}                      INSTALLATION SCRIPT${NC}"
-    echo -e "${CYAN}                         Version 2.3.4${NC}"
+    echo -e "${CYAN}                         Version 2.4.0${NC}"
     echo "================================================================"
     echo
 }

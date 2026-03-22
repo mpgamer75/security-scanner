@@ -4,12 +4,51 @@
 
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.3.4-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.4.0-red?style=for-the-badge&logo=security&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux-blue?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
 </p>
 
-**Security Scanner v2.3.4**: Outil avance d'evaluation red team. Concu pour les pentesteurs professionnels et chercheurs en securite.
+**Security Scanner v2.4.0**: Outil avance d'evaluation red team. Concu pour les pentesteurs professionnels et chercheurs en securite.
+
+## Nouveautes v2.4.0
+
+### Architecture Modulaire
+
+- **Code modularise** - Script monolithique (1,868 lignes) decoupe en 5 modules sources
+  - `security` (874 lignes): Framework principal, generation de rapports, main()
+  - `lib/osint.sh` (192 lignes): WHOIS, DNS, sous-domaines, crt.sh
+  - `lib/network.sh` (217 lignes): Scan de ports, detection de services
+  - `lib/web.sh` (229 lignes): Fingerprinting, WAF, SSL, enumeration, scan de vulns
+  - `lib/exploit.sh` (415 lignes): Searchsploit, Metasploit, credentials, post-exploitation
+- **Chargement flexible** - Recherche dans `$SCRIPT_DIR/lib/`, `/usr/local/lib/`, `~/.local/lib/`
+
+### Securite Renforcee
+
+- **Prevention XSS** - Rapports HTML avec `html.escape()` pour toutes les donnees utilisateur
+- **Validation d'entree** - Fonctions `validate_ip()`, `validate_domain()`, `validate_url()`, `validate_target()`
+- **Permissions securisees** - `umask 077` sur les repertoires de sortie
+- **Prevention injection JSON** - Fonction `json_escape()` pour sortie JSON sure
+- **Logging structure** - Journalisation horodatee dans `reports/scanner.log`
+
+### Rapport HTML Nouvelle Generation
+
+- **Mode clair/sombre** - Toggle avec support `prefers-color-scheme` et persistence localStorage
+- **Barre de progression** - Indicateur visuel en haut de page
+- **Accessibilite** - Lien skip-nav, roles ARIA, focus visible, aria-hidden sur icones decoratives
+- **Recherche globale** - Filtrage de tous les resultats avec raccourci `/`
+- **Filtres par severite** - Boutons (All/Critical/High/Medium) par section
+- **Copie en un clic** - Bouton copier par resultat avec notification toast
+- **Graphique SVG** - Donut chart de distribution des severites
+
+### CI/CD, Docker et Tests
+
+- **GitHub Actions CI** - ShellCheck, pylint, smoke tests, verification XSS, scan Bandit
+- **32 tests unitaires** - `tests/test_html_generator.py` (tous passent)
+- **ShellCheck clean** - Tous les scripts passent shellcheck
+- **Docker** - Dockerfile Kali Linux + docker-compose.yml avec volume de sortie
+- **Configuration** - Template `config.yml.example` avec timeouts, wordlists, cles API
 
 ## Nouveautes v2.3.4
 
@@ -19,139 +58,112 @@
 - **Amelioration detection vulnerabilites** - Scans de vulnerabilites completes meme sur cibles lentes
 - **Correction affichage rapport HTML** - Section "Critical Services Detected" s'affiche correctement
 - **Filtrage intelligent vulnerabilites Network** - Exclusion des messages de scan, affichage uniquement des vulnerabilites reelles
-- **Visibilite des erreurs** - Suppression de 2>/dev/null pour diagnostic facilite
 - **Timeouts optimises** - TIMEOUT_LONG passe a 900s (15 min) aligne avec nmap
 - **Mode Quick corrige** - Timeouts dynamiques selon le mode choisi
 
-### Impact Performance
-
-- **Fiabilite scans** - 100% de completion meme sur reseaux lents
-- **Detection vulnerabilites** - Plus de faux negatifs (0 vulnerabilites)
-- **Rapport HTML** - Affichage professionnel et lisible
-- **Diagnostics** - Erreurs visibles dans fichiers de sortie
-
 ## Nouveautes v2.3.3
 
-### Optimisations Majeures et Nouvelles Fonctionnalités
+### Optimisations Majeures et Nouvelles Fonctionnalites
 
-- **Génération de rapports HTML** - Rapports visuels modernes et interactifs avec CSS professionnel
-- **Scans parallélisés** - Énumération de subdomains en parallèle (subfinder, assetfinder, findomain)
-- **Scans Nmap encore plus optimisés** - Coverage étendu avec --top-ports 3000, min-rate 3000
-- **Rapport de synthèse corrigé** - Affichage complet avec prévisualisation des 50 premières lignes
+- **Generation de rapports HTML** - Rapports visuels modernes et interactifs avec CSS professionnel
+- **Scans parallelises** - Enumeration de subdomains en parallele (subfinder, assetfinder, findomain)
+- **Scans Nmap encore plus optimises** - Coverage etendu avec --top-ports 3000, min-rate 3000
 - **Timeouts dynamiques** - Timeouts adaptatifs selon le mode (quick/stealth/aggressive)
-- **Performance améliorée** - Jusqu'à 30% plus rapide grâce à la parallélisation
-
-### Corrections
-
-- **Problème d'affichage du rapport résolu** - Le rapport de synthèse s'affiche maintenant correctement
-- **Meilleure gestion des scans longs** - Timeouts optimisés pour éviter les blocages
-
-## Nouveautés v2.3.2
-
-### Optimisations et Nettoyage
-
-- **Scans Nmap optimisés** - Coverage étendu avec --top-ports 2000, version-intensity 7
-- **Détection améliorée** - Scripts NSE élargis (FTP, SSH en plus de SMB, SSL, HTTP)
-- **Disclaimer légal** - Format rétro old-school sans emojis
-- **Modes automatiques** - Les options -q, -s, -a lancent directement le scan complet
-- **OSINT allégé** - Retrait des outils obsolètes et social media (manuel recommandé)
-- **Rapports simplifiés** - Format ASCII pur pour compatibilité universelle
-
-### Outils Retirés (Obsolètes/Non Fiables)
-
-- **theHarvester** - Sources publiques obsolètes (utiliser hunter.io)
-- **Shodan** - Nécessite API key payante
-- **SQLMap automatique** - Trop invasif (utilisation manuelle recommandée)
-- **Social Media OSINT** - Meilleur en manuel pour ciblage précis
-
-### Améliorations Techniques
-
-- **Anti-blocage renforcé** - Tous les scans avec -Pn forcé
-- **Timeouts étendus** - Meilleure détection sans sacrifier la vitesse
-- **Rapports robustes** - Format ASCII simple, aucun problème d'affichage
-- **Nikto corrigé** - Option -o ajoutée pour output propre
+- **Performance amelioree** - Jusqu'a 30% plus rapide grace a la parallelisation
 
 ## Installation
 
-### Installation Automatique (Recommandée)
+### Installation Automatique (Recommandee)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/install.sh | bash
 ```
 
 Cette commande unique va:
-- Télécharger le script
-- Installer toutes les dépendances
+- Telecharger le script
+- Installer toutes les dependances
 - Configurer l'outil dans /usr/local/bin
 - Rendre la commande `security` disponible globalement
 
-### Installation Manuelle
-
-Si vous préférez installer manuellement:
+### Installation via Docker
 
 ```bash
 # Cloner le repository
 git clone https://github.com/mpgamer75/security-scanner.git
 cd security-scanner
 
-# Exécuter le script d'installation
+# Lancer avec Docker Compose
+docker-compose up -d
+
+# Executer un scan
+docker exec -it security-scanner security
+```
+
+### Installation Manuelle
+
+```bash
+# Cloner le repository
+git clone https://github.com/mpgamer75/security-scanner.git
+cd security-scanner
+
+# Executer le script d'installation
 chmod +x install.sh
 ./install.sh
 ```
 
-L'installateur détecte automatiquement votre distribution et installe les paquets appropriés.
+L'installateur detecte automatiquement votre distribution et installe les paquets appropries.
 
-## Démarrage Rapide
+## Demarrage Rapide
 
 ### Scan Basique
 
 ```bash
 security
 # Entrer l'IP cible, l'URL, le domaine
-# Sélectionner le type de scan (1-4)
+# Selectionner le type de scan (1-4)
 ```
 
 ### Reconnaissance Rapide
 
 ```bash
 security -q
-# 3x plus rapide, parfait pour une évaluation initiale
+# 3x plus rapide, parfait pour une evaluation initiale
 ```
 
-### Évaluation Red Team Complète
+### Evaluation Red Team Complete
 
 ```bash
 security -a
-# Couverture complète: tous les ports, tous les tests, préparation exploitation
+# Couverture complete: tous les ports, tous les tests, preparation exploitation
 ```
 
 ### Mode Furtif
 
 ```bash
 security -s
-# Évasion IDS/IPS, plus lent mais discret
+# Evasion IDS/IPS, plus lent mais discret
 ```
 
 ## Comparaison des Performances
 
-| Operation | v2.2.1 | v2.3.1 | v2.3.3 | v2.3.4 | Amelioration |
+| Operation | v2.2.1 | v2.3.3 | v2.3.4 | v2.4.0 | Amelioration |
 |-----------|--------|--------|--------|--------|-------------|
-| Evaluation complete | environ 60 min | environ 20 min | environ 14 min | environ 14 min | **77% plus rapide** |
-| Scan de ports | 10 min | 5 min | 4 min | 4 min | **60% plus rapide** |
-| Detection services | 20 min | 5 min | 4 min | 4 min | **80% plus rapide** |
-| Scan web | 15 min | 5 min | 4 min | 4 min | **73% plus rapide** |
-| OSINT/Subdomains | 10 min | 8 min | 3 min | 3 min | **70% plus rapide** |
-| Generation rapport | 75% succes | 98% succes | 100% succes | 100% succes | **+25%** |
-| Fiabilite scans | 85% | 95% | 95% | 100% | **+15%** |
-| Detection vulns | Variable | Bonne | Bonne | Excellente | **Aucun faux negatif** |
+| Evaluation complete | environ 60 min | environ 14 min | environ 14 min | environ 12 min | **80% plus rapide** |
+| Scan de ports | 10 min | 4 min | 4 min | 4 min | **60% plus rapide** |
+| Detection services | 20 min | 4 min | 4 min | 4 min | **80% plus rapide** |
+| Scan web | 15 min | 4 min | 4 min | 4 min | **73% plus rapide** |
+| OSINT/Subdomains | 10 min | 3 min | 3 min | 3 min | **70% plus rapide** |
+| Generation rapport | 75% succes | 100% succes | 100% succes | 100% succes | **+25%** |
+| Fiabilite scans | 85% | 95% | 100% | 100% | **+15%** |
+| Detection vulns | Variable | Bonne | Excellente | Excellente | **Aucun faux negatif** |
 
-## Prérequis
+## Prerequis
 
-### Outils Principaux (Auto-installés)
+### Outils Principaux (Auto-installes)
 
 ```bash
-# Outils réseau
-nmap masscan 
+# Outils reseau
+nmap masscan
 
 # Outils web
 gobuster nikto whatweb sqlmap
@@ -159,7 +171,7 @@ gobuster nikto whatweb sqlmap
 # Outils OSINT
 whois subfinder theHarvester
 
-# Scanners de vulnérabilités
+# Scanners de vulnerabilites
 nuclei
 ```
 
@@ -170,70 +182,70 @@ nuclei
 sudo apt update
 sudo apt install nmap masscan gobuster sqlmap whois nikto whatweb
 
-# Outils Go
-go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-go install github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
+# Outils Go (versions pinees)
+go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.6.6
+go install github.com/projectdiscovery/nuclei/v2/cmd/nuclei@v3.2.4
 
 # Outils Python
 pip3 install theHarvester
 ```
 
-## Fonctionnalités Principales
+## Fonctionnalites Principales
 
 ### 1. OSINT et Collecte d'Informations
 
-- **Énumération rapide de sous-domaines** (Subfinder, Assetfinder, Findomain)
+- **Enumeration rapide de sous-domaines** (Subfinder, Assetfinder, Findomain)
 - **Collecte d'emails** (theHarvester)
 - **Transparence des certificats** (crt.sh)
-- **Énumération DNS** (dig)
-- **Google dorking** (requêtes automatisées)
-- **Reconnaissance réseaux sociaux**
+- **Enumeration DNS** (dig)
+- **Google dorking** (requetes automatisees)
+- **Reconnaissance reseaux sociaux**
 
-### 2. Reconnaissance Réseau
+### 2. Reconnaissance Reseau
 
-- **Scan de ports optimisé** (-Pn forcé, timeouts intelligents)
-- **Détection de services** (scripts NSE Nmap)
+- **Scan de ports optimise** (-Pn force, timeouts intelligents)
+- **Detection de services** (scripts NSE Nmap)
 - **Empreinte OS**
-- **Détection de vulnérabilités** (scripts vuln)
-- **Énumération SMB** (enum4linux, smbclient)
-- **Énumération SNMP**
+- **Detection de vulnerabilites** (scripts vuln)
+- **Enumeration SMB** (enum4linux, smbclient)
+- **Enumeration SNMP**
 
 ### 3. Tests d'Applications Web
 
 - **Empreinte technologique** (WhatWeb, Wappalyzer)
-- **Détection WAF** (wafw00f)
-- **Énumération de répertoires** (Gobuster)
-- **Scan de vulnérabilités** (Nuclei, Nikto)
+- **Detection WAF** (wafw00f)
+- **Enumeration de repertoires** (Gobuster)
+- **Scan de vulnerabilites** (Nuclei, Nikto)
 - **Analyse SSL/TLS**
 - **Tests d'injection SQL** (SQLMap)
 
-### 4. Préparation à l'Exploitation
+### 4. Preparation a l'Exploitation
 
 - **Recherche base exploits** (searchsploit)
-- **Préparation modules Metasploit**
+- **Preparation modules Metasploit**
 - **Analyse surface d'attaque**
-- **Listes de credentials** (mots de passe par défaut)
-- **Scripts d'attaque automatisés**
+- **Listes de credentials** (mots de passe par defaut)
+- **Scripts d'attaque automatises**
 - **Checklist post-exploitation**
 
-## Structure des Résultats
+## Structure des Resultats
 
 ```
-redteam_20250106_143022/
+redteam_20260322_143022/
 ├── osint/
 │   ├── whois.txt
 │   ├── dns.txt
 │   ├── subdomains_subfinder.txt
-│   ├── all_subdomains.txt          # Consolidé
+│   ├── all_subdomains.txt          # Consolide
 │   ├── emails.txt
 │   ├── crt_sh.txt
 │   └── google_dorks.txt
 ├── network/
 │   ├── nmap_ports.txt              # Scan de ports
-│   ├── nmap_services.txt           # Détection services
-│   ├── nmap_vulns.txt              # Vulnérabilités
-│   ├── nmap_os.txt                 # Détection OS
-│   ├── smb_enum.txt                # Énumération SMB
+│   ├── nmap_services.txt           # Detection services
+│   ├── nmap_vulns.txt              # Vulnerabilites
+│   ├── nmap_os.txt                 # Detection OS
+│   ├── smb_enum.txt                # Enumeration SMB
 │   └── snmp_enum.txt
 ├── web/
 │   ├── whatweb.txt
@@ -250,12 +262,13 @@ redteam_20250106_143022/
 └── reports/
     ├── summary_report.txt          # Rapport texte complet
     ├── assessment.json             # Lisible machine
-    └── assessment.html             # Rapport HTML interactif - NOUVEAU
+    ├── assessment.html             # Rapport HTML interactif
+    └── scanner.log                 # Journal horodate
 ```
 
 ## Exemples d'Utilisation
 
-### Exemple 1: Évaluation Web Complète
+### Exemple 1: Evaluation Web Complete
 
 ```bash
 security
@@ -264,18 +277,18 @@ IP cible: 192.168.1.100
 URL cible: https://example.com
 Domaine: example.com
 
-Sélectionner: [4] Évaluation Red Team Complète
+Selectionner: [4] Evaluation Red Team Complete
 
-Résultats dans: redteam_20250106_143022/
+Resultats dans: redteam_20260322_143022/
 ```
 
-### Exemple 2: Scan Réseau Rapide
+### Exemple 2: Scan Reseau Rapide
 
 ```bash
 security -q
 
 IP cible: 10.0.0.50
-Sélectionner: [2] Reconnaissance Réseau
+Selectionner: [2] Reconnaissance Reseau
 
 # 3x plus rapide que le mode standard
 ```
@@ -287,40 +300,46 @@ security -s
 
 IP cible: 203.0.113.10
 Domaine: target.com
-Sélectionner: [1] OSINT et Collecte d'Informations
+Selectionner: [1] OSINT et Collecte d'Informations
 
-# Lent et discret, évite la détection
+# Lent et discret, evite la detection
 ```
 
-### Exemple 4: Scan Complet Agressif
+### Exemple 4: Scan Docker
 
 ```bash
-security -a
+docker-compose run --rm scanner security -a
 
-IP cible: 192.168.1.0/24
-URL cible: https://app.target.com
-Domaine: target.com
-Sélectionner: [4] Évaluation Red Team Complète
-
-# Tous les ports (-p-), tous les tests, SQLMap actif
+# Environnement isole avec tous les outils pre-installes
 ```
 
-## Configuration Avancée
+## Configuration Avancee
 
 ### Timeouts Personnalises
 
 Editer `/usr/local/bin/security`:
 
 ```bash
-# Ligne environ 44-48 (v2.3.4 - Optimises)
-TIMEOUT_VERY_SHORT=15
-TIMEOUT_SHORT=30
-TIMEOUT_MEDIUM=120
-TIMEOUT_LONG=900        # 15 min - aligne avec nmap --host-timeout 15m
-TIMEOUT_VERY_LONG=1200  # 20 min - pour scans de vulnerabilites complexes
+# Ligne environ 43-47 (v2.4.0 - Optimises et exportes)
+export TIMEOUT_VERY_SHORT=15
+export TIMEOUT_SHORT=30
+export TIMEOUT_MEDIUM=120
+export TIMEOUT_LONG=900        # 15 min - aligne avec nmap --host-timeout 15m
+export TIMEOUT_VERY_LONG=1200  # 20 min - pour scans de vulnerabilites complexes
 ```
 
-### Wordlists Personnalisées
+### Configuration YAML (Nouveau)
+
+```bash
+cp config.yml.example config.yml
+# Editer config.yml avec vos preferences:
+# - Timeouts personnalises
+# - Chemins wordlists
+# - Cles API (Shodan, etc.)
+# - Profils de scan
+```
+
+### Wordlists Personnalisees
 
 ```bash
 # Utiliser votre propre wordlist
@@ -328,33 +347,20 @@ export CUSTOM_WORDLIST="/chemin/vers/wordlist.txt"
 gobuster dir -u $URL -w $CUSTOM_WORDLIST
 ```
 
-### Optimisation Nmap
+## Fonctionnalites Anti-Blocage
+
+### 1. -Pn Force (Pas de Ping)
+
+Tous les scans Nmap utilisent `-Pn` pour eviter le blocage sur les hotes non-pingables:
 
 ```bash
-# Mode ultra-rapide
-nmap -Pn -T5 --min-rate 5000 --max-retries 0
-
-# Mode furtif
-nmap -Pn -T2 -f --mtu 24 --scan-delay 5s
-
-# Mode agressif
-nmap -Pn -T5 -p- --min-rate 10000
-```
-
-## Fonctionnalités Anti-Blocage
-
-### 1. -Pn Forcé (Pas de Ping)
-
-Tous les scans Nmap utilisent `-Pn` pour éviter le blocage sur les hôtes non-pingables:
-
-```bash
-nmap -Pn -sS $target  # Fonctionne toujours, jamais bloqué
+nmap -Pn -sS $target  # Fonctionne toujours, jamais bloque
 ```
 
 ### 2. Timeouts Intelligents
 
 ```bash
---host-timeout 5m     # Max 5min par hôte
+--host-timeout 5m     # Max 5min par hote
 --max-retries 1       # Seulement 1 retry
 --min-rate 2000       # Minimum 2000 paquets/sec
 ```
@@ -365,26 +371,26 @@ nmap -Pn -sS $target  # Fonctionne toujours, jamais bloqué
 --defeat-rst-ratelimit  # Contourne la limitation de taux RST
 ```
 
-### 4. Mécanismes de Secours
+### 4. Mecanismes de Secours
 
-Si un outil échoue, le scan continue avec des outils ou méthodes alternatifs.
+Si un outil echoue, le scan continue avec des outils ou methodes alternatifs.
 
-## Bonnes Pratiques de Sécurité
+## Bonnes Pratiques de Securite
 
-### Usage Légal
+### Usage Legal
 
-- **Tester uniquement vos propres systèmes**
-- **Obtenir une autorisation écrite** avant tout test
-- **Respecter le périmètre et les règles d'engagement**
+- **Tester uniquement vos propres systemes**
+- **Obtenir une autorisation ecrite** avant tout test
+- **Respecter le perimetre et les regles d'engagement**
 - **Ne jamais tester sans permission**
 
-### Sécurité Opérationnelle
+### Securite Operationnelle
 
 ```bash
 # Utiliser un VPN
 openvpn --config vpn.conf
 
-# Vérifier votre IP
+# Verifier votre IP
 curl ifconfig.me
 
 # Utiliser proxychains (optionnel)
@@ -393,14 +399,14 @@ proxychains security
 
 ### Divulgation Responsable
 
-Si vous trouvez des vulnérabilités:
+Si vous trouvez des vulnerabilites:
 
 1. Documenter tout
 2. Contacter le fournisseur/organisation
-3. Donner un délai raisonnable pour corriger (90 jours)
-4. Divulguer de manière responsable
+3. Donner un delai raisonnable pour corriger (90 jours)
+4. Divulguer de maniere responsable
 
-## Dépannage
+## Depannage
 
 ### Scans Trop Lents?
 
@@ -408,87 +414,83 @@ Si vous trouvez des vulnérabilités:
 # Utiliser le mode rapide
 security -q
 
-# Ou réduire les timeouts
+# Ou reduire les timeouts
 sudo nano /usr/local/bin/security
-# Éditer les variables TIMEOUT_*
+# Editer les variables TIMEOUT_*
 ```
 
 ### Scans Bloquent/Se Figent?
 
 ```bash
-# Vérifier que -Pn est présent
+# Verifier que -Pn est present
 grep "nmap -Pn" /usr/local/bin/security
 
-# Mettre à jour vers la dernière version
+# Mettre a jour vers la derniere version
 curl -sSL https://raw.githubusercontent.com/mpgamer75/security-scanner/main/security -o /tmp/security_new
 sudo mv /tmp/security_new /usr/local/bin/security
 sudo chmod +x /usr/local/bin/security
 ```
 
-### Rapports Non Générés?
+### Rapports Non Generes?
 
 ```bash
-# Vérifier le rapport de sauvegarde
-cat redteam_*/reports/backup_report.txt
-
-# Vérifier les fichiers individuels
+# Verifier les fichiers individuels
 find redteam_* -name "*.txt" -size +0
 
-# Vérifier les permissions
+# Verifier les permissions
 ls -la redteam_*/reports/
+
+# Consulter le journal
+cat redteam_*/reports/scanner.log
 ```
 
-### Outil Non Trouvé?
+### Outil Non Trouve?
 
 ```bash
 # Installer les outils manquants
 sudo apt install nmap gobuster nikto
 
-# Vérifier l'installation
+# Verifier l'installation
 which nmap subfinder nuclei
 
-# Réinstaller si nécessaire
+# Reinstaller si necessaire
 ./install.sh
 ```
 
 ## Feuille de Route
 
-### Version 2.4.0 (Planifiée)
+### Version 2.5.0 (Planifiee)
 
-- [Implémenté v2.3.3] Exécution parallèle pour scans OSINT
-- [Implémenté v2.3.3] Export HTML professionnel avec design moderne
-- [Implémenté v2.3.3] Optimisations Nikto, Nuclei et SMB
-- Corrélation de vulnérabilités par apprentissage automatique
-- Tableau de bord web (monitoring temps réel)
+- Correlation de vulnerabilites par apprentissage automatique
+- Tableau de bord web (monitoring temps reel)
 - Export PDF avec graphiques
-- Intégration directe Metasploit
-- Support pour GNU Parallel (scans réseau parallélisés)
+- Integration directe Metasploit
+- Support GNU Parallel (scans reseau parallelises)
 
-### Version 2.5.0 (Future)
+### Version 3.0.0 (Future)
 
-- Scan distribué (multi-hôte)
+- Scan distribue (multi-hote)
 - API REST pour l'automatisation
-- Intégration pipeline CI/CD
-- Conteneurisation Docker
-- Support déploiement cloud
+- Integration pipeline CI/CD avancee
+- Deploiement cloud natif
 
 ## Contribuer
 
 Les contributions sont bienvenues! Voici comment:
 
 1. Fork le repository
-2. Créer une branche feature (`git checkout -b feature/amelioration-geniale`)
-3. Commiter les changements (`git commit -m 'Ajout fonctionnalité géniale'`)
+2. Creer une branche feature (`git checkout -b feature/amelioration-geniale`)
+3. Commiter les changements (`git commit -m 'Ajout fonctionnalite geniale'`)
 4. Push vers la branche (`git push origin feature/amelioration-geniale`)
 5. Ouvrir une Pull Request
 
-### Directives de Développement
+### Directives de Developpement
 
 - Tester sur Ubuntu 22.04 et Kali Linux
-- Suivre les bonnes pratiques bash
-- Documenter les nouvelles fonctionnalités
-- Maintenir la rétrocompatibilité
-- Ajouter des exemples au README
+- Suivre les bonnes pratiques bash (ShellCheck clean)
+- Documenter les nouvelles fonctionnalites
+- Maintenir la retrocompatibilite
+- Ajouter des tests unitaires
 
 ## Licence
 
@@ -499,21 +501,21 @@ Licence MIT - voir le fichier [LICENSE](LICENSE)
 **mpgamer75**
 
 - GitHub: [@mpgamer75](https://github.com/mpgamer75)
-- Expertise: Cybersécurité, Tests d'Intrusion, Opérations Red Team
+- Expertise: Cybersecurite, Tests d'Intrusion, Operations Red Team
 
 ## Remerciements
 
 - [ProjectDiscovery](https://github.com/projectdiscovery) - Subfinder, Nuclei
-- [OWASP](https://owasp.org/) - Ressources de sécurité
+- [OWASP](https://owasp.org/) - Ressources de securite
 - [SecLists](https://github.com/danielmiessler/SecLists) - Wordlists
-- [Nmap](https://nmap.org/) - Scan réseau
-- Communauté open source sécurité
+- [Nmap](https://nmap.org/) - Scan reseau
+- Communaute open source securite
 
 ## Support
 
 Besoin d'aide?
 
-1. Consulter la [section dépannage](#dépannage)
+1. Consulter la [section depannage](#depannage)
 2. Lire la [documentation](README_EN.md)
 3. Chercher dans les [issues existantes](https://github.com/mpgamer75/security-scanner/issues)
 4. Ouvrir une [nouvelle issue](https://github.com/mpgamer75/security-scanner/issues/new)
@@ -521,7 +523,7 @@ Besoin d'aide?
 ---
 
 <p align="center">
-  <strong>Security Scanner v2.3.4</strong><br>
+  <strong>Security Scanner v2.4.0</strong><br>
   Outil Professionnel d'Evaluation Red Team<br>
   Rapide - Fiable - Complet
 </p>
