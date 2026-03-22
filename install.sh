@@ -490,12 +490,38 @@ install_scanner() {
         echo -e "${YELLOW}[INFO]${NC} HTML reports will not be available"
     fi
 
+    # Download lib/ modules
+    local modules=(osint.sh network.sh web.sh exploit.sh)
+    mkdir -p lib
+    local module_ok=true
+    for mod in "${modules[@]}"; do
+        echo -e "${CYAN}[INFO]${NC} Downloading module: $mod"
+        if ! curl -sSL "https://raw.githubusercontent.com/mpgamer75/security-scanner/main/lib/$mod" -o "lib/$mod"; then
+            echo -e "${RED}[ERROR]${NC} Failed to download module: $mod"
+            module_ok=false
+        fi
+    done
+    if [ "$module_ok" = false ]; then
+        echo -e "${RED}[ERROR]${NC} Some modules failed to download. Scanner may not work correctly."
+    fi
+
     # Make executable
     chmod +x security
     chmod +x html_generator.py 2>/dev/null
 
     # Install globally
+    local lib_dir="/usr/local/lib/security-scanner"
     if sudo mv security /usr/local/bin/ && sudo mv html_generator.py /usr/local/bin/ 2>/dev/null; then
+        # Install lib/ modules
+        sudo mkdir -p "$lib_dir"
+        for mod in "${modules[@]}"; do
+            if [ -f "lib/$mod" ]; then
+                sudo cp "lib/$mod" "$lib_dir/$mod"
+                sudo chmod +r "$lib_dir/$mod"
+            fi
+        done
+        rm -rf lib
+
         echo -e "${GREEN}[SUCCESS]${NC} Security Scanner installed successfully!"
         echo -e "${WHITE}You can now run:${NC} ${CYAN}security${NC}"
     else
