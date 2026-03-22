@@ -622,9 +622,10 @@ REPORT_HEADER_END
         echo "REPORT GENERATED: $(date '+%Y-%m-%d %H:%M:%S')"
         echo "END OF REPORT"
     } >> "$report" 2>/dev/null
-    
-    set -e
-    
+
+    # NOTE: keep set +e (errexit disabled) through report verification,
+    # JSON generation, and HTML generation. Re-enable at the end of generate_report().
+
     # Report verification
     if [ -f "$report" ] && [ -s "$report" ]; then
         local lines
@@ -651,6 +652,7 @@ REPORT_HEADER_END
             echo -e "${RED}[FAILED]${NC} HTML report generation failed"
         fi
 
+        set -e
         return 0
     else
         echo -e "${RED}[ERROR]${NC} Report generation failed"
@@ -663,6 +665,7 @@ REPORT_HEADER_END
             echo "Generated files:"
             find "$OUTDIR" -name "*.txt" -type f 2>/dev/null
         } > "$OUTDIR/reports/backup_report.txt"
+        set -e
         return 1
     fi
 }
@@ -713,7 +716,9 @@ generate_json_report() {
     if [ -f "$json" ] && [ -s "$json" ]; then
         echo -e "${GREEN}[SUCCESS]${NC} JSON: ${WHITE}$json${NC}"
         log_info "JSON report generated: $json"
-        command -v jq &>/dev/null && jq empty "$json" 2>/dev/null && echo -e "${GREEN}[VALID]${NC} JSON validated"
+        if command -v jq &>/dev/null && jq empty "$json" 2>/dev/null; then
+            echo -e "${GREEN}[VALID]${NC} JSON validated"
+        fi
     fi
 }
 
