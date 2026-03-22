@@ -261,9 +261,13 @@ handle_interrupt() {
 
 prepare_output() {
     OUTDIR="redteam_$(date +'%Y%m%d_%H%M%S')"
-    # Restrictive permissions: owner-only access for sensitive scan results
-    umask 077
     mkdir -p "$OUTDIR"/{osint,network,web,exploit,reports}
+
+    # When running as root (sudo), make output accessible to the calling user
+    if [ "$(id -u)" -eq 0 ] && [ -n "$SUDO_USER" ]; then
+        chown -R "$SUDO_USER:$SUDO_USER" "$OUTDIR"
+    fi
+
     echo -e "${GREEN}[READY]${NC} Output directory: ${WHITE}$OUTDIR${NC}"
     init_logging
 }
@@ -468,7 +472,8 @@ REPORT_HEADER_END
 
     # High risk issues
     if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-        count=$(grep -ci "high\|critical" "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d '\n' || echo "0")
+        # Only count actual nuclei findings, not progress/status lines
+        count=$(grep -v -E 'Templates:|RPS:|Matched:|Requests:|TOTAL.*ADDED' "$OUTDIR/web/nuclei.txt" 2>/dev/null | grep -ci "high\|critical" | tr -d '\n' || echo "0")
         count=${count:-0}
         high=$((high + count))
     fi
@@ -554,9 +559,11 @@ REPORT_HEADER_END
 
         echo "=== Web Vulnerabilities ==="
         if [ -f "$OUTDIR/web/nuclei.txt" ]; then
-            web_vuln_lines=$(wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null || echo 0)
-            if [ "$web_vuln_lines" -gt 0 ]; then
-                head -10 "$OUTDIR/web/nuclei.txt" 2>/dev/null | sed 's/^/- /'
+            # Filter out nuclei progress lines, status bars, and table formatting
+            local nuclei_findings
+            nuclei_findings=$(grep -v -E '^\[?[0-9]+:[0-9]+:[0-9]+\]|Templates:|RPS:|Matched:|Requests:|TOTAL.*ADDED|^\s*$' "$OUTDIR/web/nuclei.txt" 2>/dev/null | grep -v -P '[\x{2500}-\x{257F}]')
+            if [ -n "$nuclei_findings" ]; then
+                echo "$nuclei_findings" | head -10 | sed 's/^/- /'
             else
                 echo "- No web vulnerabilities detected"
             fi
@@ -615,9 +622,10 @@ REPORT_HEADER_END
         echo "REPORT GENERATED: $(date '+%Y-%m-%d %H:%M:%S')"
         echo "END OF REPORT"
     } >> "$report" 2>/dev/null
-    
-    set -e
-    
+
+    # NOTE: keep set +e (errexit disabled) through report verification,
+    # JSON generation, and HTML generation. Re-enable at the end of generate_report().
+
     # Report verification
     if [ -f "$report" ] && [ -s "$report" ]; then
         local lines
@@ -644,6 +652,7 @@ REPORT_HEADER_END
             echo -e "${RED}[FAILED]${NC} HTML report generation failed"
         fi
 
+        set -e
         return 0
     else
         echo -e "${RED}[ERROR]${NC} Report generation failed"
@@ -656,6 +665,7 @@ REPORT_HEADER_END
             echo "Generated files:"
             find "$OUTDIR" -name "*.txt" -type f 2>/dev/null
         } > "$OUTDIR/reports/backup_report.txt"
+        set -e
         return 1
     fi
 }
@@ -674,7 +684,7 @@ generate_json_report() {
     [ -f "$OUTDIR/network/nmap_ports.txt" ] && port_count=$(grep -c "open" "$OUTDIR/network/nmap_ports.txt" 2>/dev/null || echo "0")
     [ -f "$OUTDIR/network/nmap_vulns.txt" ] && vuln_count=$(grep -c "VULNERABLE" "$OUTDIR/network/nmap_vulns.txt" 2>/dev/null || echo "0")
     [ -f "$OUTDIR/web/gobuster_common.txt" ] && dir_count=$(wc -l < "$OUTDIR/web/gobuster_common.txt" 2>/dev/null | tr -d ' ' || echo "0")
-    [ -f "$OUTDIR/web/nuclei.txt" ] && web_vuln_count=$(wc -l < "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d ' ' || echo "0")
+    [ -f "$OUTDIR/web/nuclei.txt" ] && web_vuln_count=$(grep -cv -E 'Templates:|RPS:|Matched:|Requests:|TOTAL.*ADDED|^\s*$' "$OUTDIR/web/nuclei.txt" 2>/dev/null | tr -d ' ' || echo "0")
     file_count=$(find "$OUTDIR" -type f 2>/dev/null | wc -l | tr -d ' ')
 
     {
@@ -706,7 +716,9 @@ generate_json_report() {
     if [ -f "$json" ] && [ -s "$json" ]; then
         echo -e "${GREEN}[SUCCESS]${NC} JSON: ${WHITE}$json${NC}"
         log_info "JSON report generated: $json"
-        command -v jq &>/dev/null && jq empty "$json" 2>/dev/null && echo -e "${GREEN}[VALID]${NC} JSON validated"
+        if command -v jq &>/dev/null && jq empty "$json" 2>/dev/null; then
+            echo -e "${GREEN}[VALID]${NC} JSON validated"
+        fi
     fi
 }
 
@@ -869,9 +881,11 @@ main() {
     echo -e "${BRIGHT_RED}║${NC}              ${GREEN}COMPLETED${NC}                            ${BRIGHT_RED}║${NC}"
     echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
     echo
-    echo -e "${ORANGE}Results:${NC} ${WHITE}$OUTDIR/${NC}"
-    echo -e "${ORANGE}Report:${NC} ${WHITE}$OUTDIR/reports/summary_report.txt${NC}"
-    echo -e "${ORANGE}Scripts:${NC} ${WHITE}$OUTDIR/exploit/auto_attack.sh${NC}"
+    echo -e "${ORANGE}Results:${NC}  ${WHITE}$OUTDIR/${NC}"
+    echo -e "${ORANGE}Report:${NC}   ${WHITE}$OUTDIR/reports/summary_report.txt${NC}"
+    [ -f "$OUTDIR/reports/assessment.html" ] && echo -e "${ORANGE}HTML:${NC}     ${WHITE}$OUTDIR/reports/assessment.html${NC}"
+    [ -f "$OUTDIR/reports/assessment.json" ] && echo -e "${ORANGE}JSON:${NC}     ${WHITE}$OUTDIR/reports/assessment.json${NC}"
+    echo -e "${ORANGE}Scripts:${NC}  ${WHITE}$OUTDIR/exploit/auto_attack.sh${NC}"
     echo
     echo -e "${YELLOW}Use responsibly - Authorized testing only${NC}"
     echo
