@@ -192,7 +192,8 @@ detect_web_services() {
     echo -e "${CYAN}[INFO]${NC} Detecting web services on $target..."
 
     # Quick check for common web ports
-    local web_check=$(timeout 30 nmap -Pn -p 80,443,8080,8443 --open -T4 "$target" 2>/dev/null | grep -E '^(80|443|8080|8443)/tcp.*open')
+    local web_check
+    web_check=$(timeout 30 nmap -Pn -p 80,443,8080,8443 --open -T4 "$target" 2>/dev/null | grep -E '^(80|443|8080|8443)/tcp.*open')
 
     if echo "$web_check" | grep -q '443/tcp.*open'; then
         detected_url="https://$target"

@@ -4,10 +4,8 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
-GRAY='\033[0;90m'
 NC='\033[0m'
 
 display_install_banner() {
@@ -135,13 +133,13 @@ install_tools() {
         if ! command -v findomain &> /dev/null; then
             echo -e "${CYAN}[INFO]${NC} Installing findomain..."
             # Findomain requires a direct binary download
-            wget -q https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux -O /tmp/findomain 2>/dev/null && {
+            if wget -q https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux -O /tmp/findomain 2>/dev/null; then
                 sudo mv /tmp/findomain /usr/local/bin/findomain
                 sudo chmod +x /usr/local/bin/findomain
                 echo -e "${GREEN}[OK]${NC} Findomain installed"
-            } || {
+            else
                 echo -e "${YELLOW}[WARNING]${NC} Findomain installation failed"
-            }
+            fi
         fi
         
         if ! command -v rustscan &> /dev/null; then
@@ -220,8 +218,10 @@ install_wordlists() {
     
     # Check if wordlists already exist
     if [ -f "$wordlist_dir/common.txt" ] && [ -f "$wordlist_dir/big.txt" ]; then
-        local common_size=$(stat -c%s "$wordlist_dir/common.txt" 2>/dev/null || stat -f%z "$wordlist_dir/common.txt" 2>/dev/null || echo "0")
-        local big_size=$(stat -c%s "$wordlist_dir/big.txt" 2>/dev/null || stat -f%z "$wordlist_dir/big.txt" 2>/dev/null || echo "0")
+        local common_size
+        common_size=$(stat -c%s "$wordlist_dir/common.txt" 2>/dev/null || stat -f%z "$wordlist_dir/common.txt" 2>/dev/null || echo "0")
+        local big_size
+        big_size=$(stat -c%s "$wordlist_dir/big.txt" 2>/dev/null || stat -f%z "$wordlist_dir/big.txt" 2>/dev/null || echo "0")
         
         if [ "$common_size" -gt 1000 ] && [ "$big_size" -gt 5000 ]; then
             echo -e "${GREEN}[OK]${NC} Wordlists already available"
@@ -465,8 +465,7 @@ install_nuclei_templates() {
     
     if command -v nuclei &> /dev/null; then
         echo -e "${CYAN}[INFO]${NC} Updating Nuclei templates..."
-        nuclei -update-templates &> /dev/null
-        if [ $? -eq 0 ]; then
+        if nuclei -update-templates &> /dev/null; then
             echo -e "${GREEN}[OK]${NC} Nuclei templates updated"
         else
             echo -e "${YELLOW}[WARNING]${NC} Failed to update Nuclei templates automatically"

@@ -28,9 +28,10 @@ run_web_scans() {
     echo -e "${CYAN}[TARGET]${NC} $url"
     echo
 
-    local domain=$(echo "$url" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|:.*||')
+    local domain
+    domain=$(echo "$url" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|:.*||')
     
-    # Check rapide des ports web ouverts
+    # Quick check for open web ports
     execute_scan "Web Port Check" \
         "timeout 30 nmap -Pn -p 80,443,8080,8443 --open '$domain' 2>/dev/null | \
          grep -E 'open' || echo 'No standard web ports detected (continuing anyway)'" \
