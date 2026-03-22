@@ -6,13 +6,24 @@ Professional, corporate-grade HTML report with modern UX/UI
 """
 
 import sys
+import html
 import json
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
-def generate_html_report(outdir, target, url, domain, scan_mode):
+VERSION = "2.4.0"
+
+
+def generate_html_report(outdir: str, target: str, url: str, domain: str, scan_mode: str) -> str:
     """Generate a professional, enterprise-grade HTML report"""
+
+    # Escape all user-controlled inputs to prevent XSS
+    safe_target = html.escape(target, quote=True)
+    safe_url = html.escape(url, quote=True) if url and url != 'NONE' else ''
+    safe_domain = html.escape(domain, quote=True) if domain and domain != 'NONE' else ''
+    safe_scan_mode = html.escape(scan_mode, quote=True)
 
     # Read statistics from files with error handling
     stats = {
@@ -147,12 +158,12 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             </div>'''
 
     # Generate HTML with professional design
-    html = f'''<!DOCTYPE html>
+    report_html = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Report - {target}</title>
+    <title>Security Report - {safe_target}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {{
@@ -185,6 +196,299 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
             --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }}
+
+        /* Light Mode Variables */
+        [data-theme="light"] {{
+            --bg-primary: #f0f2f5;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e8eaf0;
+            --bg-elevated: rgba(0, 0, 0, 0.04);
+            --bg-elevated-hover: rgba(0, 0, 0, 0.07);
+            --text-primary: #1a1d29;
+            --text-secondary: #4a5568;
+            --text-tertiary: #718096;
+            --border-subtle: rgba(0, 0, 0, 0.1);
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+        }}
+
+        /* System preference: respect prefers-color-scheme unless overridden */
+        @media (prefers-color-scheme: light) {{
+            :root:not([data-theme="dark"]) {{
+                --bg-primary: #f0f2f5;
+                --bg-secondary: #ffffff;
+                --bg-tertiary: #e8eaf0;
+                --bg-elevated: rgba(0, 0, 0, 0.04);
+                --bg-elevated-hover: rgba(0, 0, 0, 0.07);
+                --text-primary: #1a1d29;
+                --text-secondary: #4a5568;
+                --text-tertiary: #718096;
+                --border-subtle: rgba(0, 0, 0, 0.1);
+                --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+                --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+                --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+            }}
+        }}
+
+        /* Scroll progress bar */
+        #scroll-progress {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            z-index: 9999;
+            transition: width 0.1s linear;
+        }}
+
+        /* Skip navigation for accessibility */
+        .skip-nav {{
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--accent-primary);
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            font-weight: 600;
+            z-index: 10000;
+            border-radius: 0 0 8px 0;
+        }}
+        .skip-nav:focus {{
+            top: 0;
+        }}
+
+        /* Theme toggle button */
+        .theme-toggle {{
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 24px;
+            padding: 8px 14px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }}
+        .theme-toggle:hover {{
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }}
+        .theme-toggle:focus-visible {{
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }}
+
+        /* Search bar */
+        .search-container {{
+            margin-bottom: 24px;
+            position: relative;
+        }}
+        .search-input {{
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }}
+        .search-input:focus {{
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+        }}
+        .search-icon {{
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-tertiary);
+            font-size: 1.1rem;
+            pointer-events: none;
+        }}
+        .search-clear {{
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: none;
+        }}
+        .search-clear.visible {{
+            display: block;
+        }}
+        .search-clear:hover {{
+            color: var(--text-primary);
+        }}
+
+        /* Copy button on findings */
+        .finding-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }}
+        .finding-text {{
+            flex: 1;
+            white-space: pre-wrap;
+            margin: 0;
+            font-family: inherit;
+            font-size: inherit;
+        }}
+        .copy-btn {{
+            flex-shrink: 0;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }}
+        .copy-btn:hover {{
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }}
+        .copy-btn:focus-visible {{
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }}
+
+        /* Toast notification */
+        .toast {{
+            position: fixed;
+            bottom: 100px;
+            right: 32px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px 20px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: var(--shadow-lg);
+            z-index: 2000;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }}
+        .toast.show {{
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }}
+
+        /* Donut chart */
+        .donut-chart-container {{
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }}
+        .donut-svg {{
+            transform: rotate(-90deg);
+        }}
+        .donut-legend {{
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }}
+        .legend-dot {{
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }}
+        .legend-label {{
+            color: var(--text-secondary);
+        }}
+        .legend-value {{
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-left: auto;
+            padding-left: 16px;
+        }}
+
+        /* Severity filter buttons */
+        .severity-filters {{
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }}
+        .filter-btn {{
+            padding: 6px 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .filter-btn:hover {{
+            color: var(--text-primary);
+            border-color: currentColor;
+        }}
+        .filter-btn.active {{
+            color: white;
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }}
+        .filter-btn.critical.active {{ background: var(--critical); border-color: var(--critical); }}
+        .filter-btn.high.active {{ background: var(--high); border-color: var(--high); color: #1a1d29; }}
+        .filter-btn.medium.active {{ background: var(--medium); border-color: var(--medium); color: #1a1d29; }}
+        .filter-btn.low.active {{ background: var(--low); border-color: var(--low); color: #1a1d29; }}
+
+        /* Focus visible for accessibility */
+        :focus-visible {{
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }}
+
+        /* No results message */
+        .no-results {{
+            text-align: center;
+            padding: 32px;
+            color: var(--text-tertiary);
+            font-style: italic;
+            display: none;
         }}
 
         * {{
@@ -783,34 +1087,48 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
     </style>
 </head>
 <body>
+    <!-- Scroll Progress Bar -->
+    <div id="scroll-progress" role="progressbar" aria-label="Page scroll progress"></div>
+
+    <!-- Skip Navigation (Accessibility) -->
+    <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">
+        <span id="themeIcon">☀️</span> <span id="themeLabel">Light</span>
+    </button>
+
     <!-- Scroll to Top Button -->
     <button class="scroll-top" id="scrollTop" aria-label="Scroll to top">↑</button>
 
+    <!-- Toast Notification -->
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
     <!-- Header -->
-    <header class="header">
+    <header class="header" role="banner">
         <div class="header-content">
             <h1>Security Report</h1>
             <div class="header-meta">
                 <div class="meta-item">
                     <span>🎯</span>
-                    <strong>Target:</strong> {target}
+                    <strong>Target:</strong> {safe_target}
                 </div>
-                {f'<div class="meta-item"><span>🌐</span><strong>URL:</strong> {url}</div>' if url and url != 'NONE' else ''}
-                {f'<div class="meta-item"><span>🔗</span><strong>Domain:</strong> {domain}</div>' if domain and domain != 'NONE' else ''}
+                {f'<div class="meta-item"><span>🌐</span><strong>URL:</strong> {safe_url}</div>' if safe_url else ''}
+                {f'<div class="meta-item"><span>🔗</span><strong>Domain:</strong> {safe_domain}</div>' if safe_domain else ''}
                 <div class="meta-item">
                     <span>📅</span>
                     <strong>Date:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')}
                 </div>
                 <div class="meta-item">
                     <span>⚡</span>
-                    <strong>Mode:</strong> {scan_mode}
+                    <strong>Mode:</strong> {safe_scan_mode}
                 </div>
             </div>
         </div>
     </header>
 
     <!-- Main Container -->
-    <div class="container">
+    <main class="container" id="main-content" role="main">
         <!-- Risk Score Banner -->
         <div class="risk-banner">
             <div class="risk-score">{risk_score}<span style="font-size: 2rem;">/100</span></div>
@@ -818,58 +1136,72 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
         </div>
 
         <!-- Stats Grid -->
-        <div class="stats-grid">
+        <div class="stats-grid" role="region" aria-label="Scan statistics">
             <div class="stat-card critical">
-                <div class="stat-icon">🔴</div>
+                <div class="stat-icon" aria-hidden="true">🔴</div>
                 <div class="stat-number" data-target="{stats['critical']}">{stats['critical']}</div>
                 <div class="stat-label">Critical Issues</div>
             </div>
             <div class="stat-card high">
-                <div class="stat-icon">🟠</div>
+                <div class="stat-icon" aria-hidden="true">🟠</div>
                 <div class="stat-number" data-target="{stats['high']}">{stats['high']}</div>
                 <div class="stat-label">High Risk</div>
             </div>
             <div class="stat-card medium">
-                <div class="stat-icon">🟡</div>
+                <div class="stat-icon" aria-hidden="true">🟡</div>
                 <div class="stat-number" data-target="{stats['medium']}">{stats['medium']}</div>
                 <div class="stat-label">Medium Risk</div>
             </div>
             <div class="stat-card info">
-                <div class="stat-icon">🔵</div>
+                <div class="stat-icon" aria-hidden="true">🔵</div>
                 <div class="stat-number" data-target="{stats['ports']}">{stats['ports']}</div>
                 <div class="stat-label">Open Ports</div>
             </div>
             <div class="stat-card info">
-                <div class="stat-icon">🌐</div>
+                <div class="stat-icon" aria-hidden="true">🌐</div>
                 <div class="stat-number" data-target="{stats['subs']}">{stats['subs']}</div>
                 <div class="stat-label">Subdomains</div>
             </div>
         </div>
 
+        <!-- Search Bar -->
+        <div class="search-container" role="search">
+            <span class="search-icon" aria-hidden="true">🔍</span>
+            <input type="search" class="search-input" id="searchInput"
+                   placeholder="Search findings…" aria-label="Search findings">
+            <button class="search-clear" id="searchClear" aria-label="Clear search">✕</button>
+        </div>
+
         <!-- Tabs Navigation -->
-        <div class="tabs">
-            <button class="tab-button active" data-tab="overview">
+        <div class="tabs" role="tablist" aria-label="Report sections">
+            <button class="tab-button active" role="tab" aria-selected="true"
+                    aria-controls="overview" data-tab="overview" id="tab-overview">
                 📊 Overview
             </button>
-            <button class="tab-button" data-tab="network">
+            <button class="tab-button" role="tab" aria-selected="false"
+                    aria-controls="network" data-tab="network" id="tab-network">
                 🔒 Network
-                {f'<span class="tab-badge">{len(network_vulns)}</span>' if network_vulns else ''}
+                {f'<span class="tab-badge" aria-label="{len(network_vulns)} network findings">{len(network_vulns)}</span>' if network_vulns else ''}
             </button>
-            <button class="tab-button" data-tab="web">
+            <button class="tab-button" role="tab" aria-selected="false"
+                    aria-controls="web" data-tab="web" id="tab-web">
                 🌐 Web
-                {f'<span class="tab-badge">{len(web_vulns)}</span>' if web_vulns else ''}
+                {f'<span class="tab-badge" aria-label="{len(web_vulns)} web findings">{len(web_vulns)}</span>' if web_vulns else ''}
             </button>
-            <button class="tab-button" data-tab="services">
+            <button class="tab-button" role="tab" aria-selected="false"
+                    aria-controls="services" data-tab="services" id="tab-services">
                 ⚙️ Services
-                {f'<span class="tab-badge">{len(services)}</span>' if services else ''}
+                {f'<span class="tab-badge" aria-label="{len(services)} services">{len(services)}</span>' if services else ''}
             </button>
-            <button class="tab-button" data-tab="recommendations">
+            <button class="tab-button" role="tab" aria-selected="false"
+                    aria-controls="recommendations" data-tab="recommendations" id="tab-recommendations">
                 💡 Recommendations
             </button>
         </div>
 
         <!-- Tab: Overview -->
-        <div class="tab-content active" id="overview">
+        <div class="tab-content active" id="overview"
+             role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
             <div class="section">
                 <div class="section-header">
                     <h2 class="section-title">
@@ -879,7 +1211,7 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                 </div>
                 <div style="line-height: 1.8; color: var(--text-secondary);">
                     <p style="margin-bottom: 16px;">
-                        This security assessment was conducted on <strong style="color: var(--text-primary);">{target}</strong> 
+                        This security assessment was conducted on <strong style="color: var(--text-primary);">{safe_target}</strong>
                         using automated scanning tools and techniques. The assessment identified 
                         <strong style="color: var(--critical);">{stats['critical']} critical</strong>, 
                         <strong style="color: var(--high);">{stats['high']} high</strong>, and 
@@ -898,52 +1230,64 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             </div>
 
             {critical_services_html}
+
+            <!-- Donut Chart: Vulnerability Distribution -->
+            {_generate_donut_chart(stats)}
         </div>
 
         <!-- Tab: Network -->
-        <div class="tab-content" id="network">
+        <div class="tab-content" id="network"
+             role="tabpanel" aria-labelledby="tab-network" tabindex="0">
             <div class="section">
                 <div class="section-header">
                     <h2 class="section-title">
-                        <span class="section-icon">🔒</span>
+                        <span class="section-icon" aria-hidden="true">🔒</span>
                         Network Vulnerabilities
                     </h2>
-                    <div class="section-actions">
-                        <button class="btn" onclick="filterFindings('network', 'all')">All</button>
-                        <button class="btn" onclick="filterFindings('network', 'critical')">Critical</button>
-                    </div>
                 </div>
-                <div class="findings-grid" id="network-findings">
+                <div class="severity-filters" role="group" aria-label="Filter by severity">
+                    <button class="filter-btn active" data-filter="all" data-target="network-findings">All</button>
+                    <button class="filter-btn critical" data-filter="critical" data-target="network-findings">🔴 Critical</button>
+                    <button class="filter-btn high" data-filter="high" data-target="network-findings">🟠 High</button>
+                    <button class="filter-btn medium" data-filter="medium" data-target="network-findings">🟡 Medium</button>
+                </div>
+                <div class="findings-grid" id="network-findings" role="list" aria-label="Network vulnerability findings">
                     {_generate_findings(network_vulns, "No network vulnerabilities detected or scan not performed. This is a positive security indicator.")}
                 </div>
+                <p class="no-results" id="network-no-results">No findings match the current filter.</p>
             </div>
         </div>
 
         <!-- Tab: Web -->
-        <div class="tab-content" id="web">
+        <div class="tab-content" id="web"
+             role="tabpanel" aria-labelledby="tab-web" tabindex="0">
             <div class="section">
                 <div class="section-header">
                     <h2 class="section-title">
-                        <span class="section-icon">🌐</span>
+                        <span class="section-icon" aria-hidden="true">🌐</span>
                         Web Application Vulnerabilities
                     </h2>
-                    <div class="section-actions">
-                        <button class="btn" onclick="filterFindings('web', 'all')">All</button>
-                        <button class="btn" onclick="filterFindings('web', 'high')">High</button>
-                    </div>
                 </div>
-                <div class="findings-grid" id="web-findings">
+                <div class="severity-filters" role="group" aria-label="Filter by severity">
+                    <button class="filter-btn active" data-filter="all" data-target="web-findings">All</button>
+                    <button class="filter-btn critical" data-filter="critical" data-target="web-findings">🔴 Critical</button>
+                    <button class="filter-btn high" data-filter="high" data-target="web-findings">🟠 High</button>
+                    <button class="filter-btn medium" data-filter="medium" data-target="web-findings">🟡 Medium</button>
+                </div>
+                <div class="findings-grid" id="web-findings" role="list" aria-label="Web vulnerability findings">
                     {_generate_findings(web_vulns, "No web vulnerabilities detected or scan not performed. Continue monitoring for emerging threats.")}
                 </div>
+                <p class="no-results" id="web-no-results">No findings match the current filter.</p>
             </div>
         </div>
 
         <!-- Tab: Services -->
-        <div class="tab-content" id="services">
+        <div class="tab-content" id="services"
+             role="tabpanel" aria-labelledby="tab-services" tabindex="0">
             <div class="section">
                 <div class="section-header">
                     <h2 class="section-title">
-                        <span class="section-icon">⚙️</span>
+                        <span class="section-icon" aria-hidden="true">⚙️</span>
                         Detected Services
                     </h2>
                 </div>
@@ -952,7 +1296,8 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
         </div>
 
         <!-- Tab: Recommendations -->
-        <div class="tab-content" id="recommendations">
+        <div class="tab-content" id="recommendations"
+             role="tabpanel" aria-labelledby="tab-recommendations" tabindex="0">
             <div class="section">
                 <div class="section-header">
                     <h2 class="section-title">
@@ -1033,55 +1378,103 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
 
         <!-- Footer -->
         <footer class="footer">
-            <p><strong>Security Scanner v2.3.4</strong></p>
+            <p><strong>Security Scanner v{VERSION}</strong></p>
             <p>Report Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
             <p style="margin-top: 16px; color: var(--text-tertiary);">
                 This tool is for authorized security testing only. Unauthorized use is illegal.
             </p>
         </footer>
-    </div>
+    </main>
 
     <script>
-        // Tab Switching
+        // ============================================================
+        // Theme Toggle (Light/Dark Mode)
+        // ============================================================
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const themeLabel = document.getElementById('themeLabel');
+        const htmlEl = document.documentElement;
+
+        const applyTheme = (theme) => {{
+            htmlEl.setAttribute('data-theme', theme);
+            if (theme === 'light') {{
+                themeIcon.textContent = '🌙';
+                themeLabel.textContent = 'Dark';
+            }} else {{
+                themeIcon.textContent = '☀️';
+                themeLabel.textContent = 'Light';
+            }}
+        }};
+
+        // Load saved preference or detect system preference
+        const savedTheme = localStorage.getItem('reportTheme');
+        if (savedTheme) {{
+            applyTheme(savedTheme);
+        }} else {{
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            applyTheme(prefersDark ? 'dark' : 'light');
+        }}
+
+        themeToggleBtn.addEventListener('click', () => {{
+            const current = htmlEl.getAttribute('data-theme') || 'dark';
+            const next = current === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+            localStorage.setItem('reportTheme', next);
+        }});
+
+        // ============================================================
+        // Tab Switching with ARIA support
+        // ============================================================
         document.querySelectorAll('.tab-button').forEach(button => {{
             button.addEventListener('click', () => {{
                 const tabId = button.dataset.tab;
-                
-                // Update buttons
-                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+
+                document.querySelectorAll('.tab-button').forEach(btn => {{
+                    btn.classList.remove('active');
+                    btn.setAttribute('aria-selected', 'false');
+                }});
                 button.classList.add('active');
-                
-                // Update content
+                button.setAttribute('aria-selected', 'true');
+
                 document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(tabId).classList.add('active');
-                
-                // Scroll to top of content
+
                 window.scrollTo({{ top: 0, behavior: 'smooth' }});
             }});
         }});
 
-        // Scroll to Top Button
+        // ============================================================
+        // Scroll Progress Bar
+        // ============================================================
+        const progressBar = document.getElementById('scroll-progress');
         const scrollTopBtn = document.getElementById('scrollTop');
-        
+
         window.addEventListener('scroll', () => {{
-            if (window.pageYOffset > 300) {{
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+            progressBar.style.width = progress + '%';
+
+            if (scrollTop > 300) {{
                 scrollTopBtn.classList.add('visible');
             }} else {{
                 scrollTopBtn.classList.remove('visible');
             }}
         }});
-        
+
         scrollTopBtn.addEventListener('click', () => {{
             window.scrollTo({{ top: 0, behavior: 'smooth' }});
         }});
 
+        // ============================================================
         // Animate Numbers on Load
+        // ============================================================
         const animateNumber = (element) => {{
-            const target = parseInt(element.dataset.target);
+            const target = parseInt(element.dataset.target) || 0;
+            if (target === 0) return;
             const duration = 1000;
             const step = target / (duration / 16);
             let current = 0;
-            
             const timer = setInterval(() => {{
                 current += step;
                 if (current >= target) {{
@@ -1093,17 +1486,10 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
             }}, 16);
         }};
 
-        // Intersection Observer for animations
-        const observerOptions = {{
-            threshold: 0.5,
-            rootMargin: '0px'
-        }};
-
         const observer = new IntersectionObserver((entries) => {{
             entries.forEach(entry => {{
                 if (entry.isIntersecting) {{
-                    const numbers = entry.target.querySelectorAll('.stat-number[data-target]');
-                    numbers.forEach(num => {{
+                    entry.target.querySelectorAll('.stat-number[data-target]').forEach(num => {{
                         if (!num.classList.contains('animated')) {{
                             animateNumber(num);
                             num.classList.add('animated');
@@ -1112,57 +1498,206 @@ def generate_html_report(outdir, target, url, domain, scan_mode):
                     observer.unobserve(entry.target);
                 }}
             }});
-        }}, observerOptions);
+        }}, {{ threshold: 0.5 }});
 
-        // Observe stats grid
         const statsGrid = document.querySelector('.stats-grid');
-        if (statsGrid) {{
-            observer.observe(statsGrid);
-        }}
+        if (statsGrid) observer.observe(statsGrid);
 
-        // Filter Findings
-        window.filterFindings = (section, filter) => {{
-            const container = document.getElementById(`${{section}}-findings`);
-            const findings = container.querySelectorAll('.finding-item');
-            
-            findings.forEach(finding => {{
-                if (filter === 'all') {{
-                    finding.style.display = 'block';
-                }} else {{
-                    if (finding.classList.contains(filter)) {{
-                        finding.style.display = 'block';
-                    }} else {{
-                        finding.style.display = 'none';
+        // ============================================================
+        // Severity Filter Buttons
+        // ============================================================
+        document.querySelectorAll('.severity-filters').forEach(filterGroup => {{
+            filterGroup.querySelectorAll('.filter-btn').forEach(btn => {{
+                btn.addEventListener('click', () => {{
+                    const filter = btn.dataset.filter;
+                    const targetId = btn.dataset.target;
+
+                    filterGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    const container = document.getElementById(targetId);
+                    if (!container) return;
+                    const findings = container.querySelectorAll('.finding-item');
+                    let visible = 0;
+
+                    findings.forEach(finding => {{
+                        const show = filter === 'all' || finding.classList.contains(filter);
+                        finding.style.display = show ? '' : 'none';
+                        if (show) visible++;
+                    }});
+
+                    // Show "no results" message
+                    const noResultsId = targetId.replace('-findings', '-no-results');
+                    const noResultsEl = document.getElementById(noResultsId);
+                    if (noResultsEl) {{
+                        noResultsEl.style.display = visible === 0 && findings.length > 0 ? 'block' : 'none';
                     }}
-                }}
+                }});
+            }});
+        }});
+
+        // ============================================================
+        // Copy-to-Clipboard with Toast
+        // ============================================================
+        const toast = document.getElementById('toast');
+        let toastTimer;
+
+        const showToast = (message) => {{
+            toast.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+        }};
+
+        document.querySelectorAll('.copy-btn').forEach(btn => {{
+            btn.addEventListener('click', (e) => {{
+                e.stopPropagation();
+                const text = btn.closest('.finding-item').querySelector('.finding-text').textContent;
+                navigator.clipboard.writeText(text).then(() => {{
+                    showToast('✓ Copied to clipboard');
+                }}).catch(() => {{
+                    // Fallback for older browsers
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showToast('✓ Copied to clipboard');
+                }});
+            }});
+        }});
+
+        // ============================================================
+        // Global Search / Filter
+        // ============================================================
+        const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
+
+        const performSearch = (query) => {{
+            const q = query.trim().toLowerCase();
+            searchClear.classList.toggle('visible', q.length > 0);
+
+            document.querySelectorAll('.finding-item').forEach(item => {{
+                const text = item.textContent.toLowerCase();
+                item.style.display = (!q || text.includes(q)) ? '' : 'none';
             }});
         }};
 
+        searchInput.addEventListener('input', (e) => performSearch(e.target.value));
+
+        searchClear.addEventListener('click', () => {{
+            searchInput.value = '';
+            performSearch('');
+            searchInput.focus();
+        }});
+
+        // ============================================================
         // Keyboard Shortcuts
+        // ============================================================
         document.addEventListener('keydown', (e) => {{
-            // Press 'T' to scroll to top
+            // Skip if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
             if (e.key === 't' || e.key === 'T') {{
                 window.scrollTo({{ top: 0, behavior: 'smooth' }});
             }}
-            
-            // Press 1-5 for tab navigation
+
             const tabKeys = {{'1': 'overview', '2': 'network', '3': 'web', '4': 'services', '5': 'recommendations'}};
             if (tabKeys[e.key]) {{
                 const button = document.querySelector(`[data-tab="${{tabKeys[e.key]}}"]`);
                 if (button) button.click();
             }}
+
+            // '/' to focus search
+            if (e.key === '/') {{
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            }}
         }});
 
-        // Console easter egg
         console.log('%c Security Report Loaded ', 'background: #ff6b35; color: white; font-size: 16px; padding: 10px; font-weight: bold;');
-        console.log('%c Keyboard Shortcuts: T = Top | 1-5 = Tab Navigation ', 'color: #00d4ff; font-size: 12px;');
+        console.log('%c Keyboard Shortcuts: T = Top | 1-5 = Tabs | / = Search ', 'color: #00d4ff; font-size: 12px;');
     </script>
 </body>
 </html>'''
 
-    return html
+    return report_html
 
-def _generate_findings(findings, empty_message=None, severity_class=""):
+def _generate_donut_chart(stats: dict) -> str:
+    """Generate an SVG donut chart showing vulnerability severity distribution"""
+    total = stats['critical'] + stats['high'] + stats['medium'] + stats['low']
+    if total == 0:
+        return ''
+
+    radius = 60
+    circumference = 2 * 3.14159 * radius
+    colors = {
+        'critical': ('#ff3b3b', 'Critical', stats['critical']),
+        'high':     ('#ff8c42', 'High',     stats['high']),
+        'medium':   ('#ffd23f', 'Medium',   stats['medium']),
+        'low':      ('#3bceac', 'Low',      stats['low']),
+    }
+
+    # Build SVG segments
+    segments = ''
+    offset = 0.0
+    for key, (color, label, count) in colors.items():
+        if count == 0:
+            continue
+        fraction = count / total
+        dash = fraction * circumference
+        gap = circumference - dash
+        segments += (
+            f'<circle cx="80" cy="80" r="{radius}" fill="none" stroke="{color}" '
+            f'stroke-width="20" stroke-dasharray="{dash:.2f} {gap:.2f}" '
+            f'stroke-dashoffset="{-offset:.2f}" style="transition: stroke-dasharray 0.6s ease;">'
+            f'<title>{label}: {count} ({fraction*100:.1f}%)</title></circle>'
+        )
+        offset += dash
+
+    # Legend items
+    legend_items = ''
+    for key, (color, label, count) in colors.items():
+        pct = f'{count/total*100:.0f}%' if total > 0 else '0%'
+        legend_items += (
+            f'<div class="legend-item">'
+            f'<span class="legend-dot" style="background:{color};" aria-hidden="true"></span>'
+            f'<span class="legend-label">{label}</span>'
+            f'<span class="legend-value">{count} <span style="color:var(--text-tertiary);font-weight:400;font-size:0.8rem;">({pct})</span></span>'
+            f'</div>'
+        )
+
+    return f'''
+        <div class="section" style="margin-top:24px;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon" aria-hidden="true">📊</span>
+                    Vulnerability Distribution
+                </h2>
+            </div>
+            <div class="donut-chart-container" role="img" aria-label="Donut chart: {stats['critical']} critical, {stats['high']} high, {stats['medium']} medium, {stats['low']} low">
+                <svg width="160" height="160" viewBox="0 0 160 160" class="donut-svg" aria-hidden="true">
+                    <circle cx="80" cy="80" r="{radius}" fill="none" stroke="var(--bg-tertiary)" stroke-width="20"/>
+                    {segments}
+                    <text x="80" y="85" text-anchor="middle"
+                          style="fill:var(--text-primary);font-size:1.2rem;font-weight:800;font-family:Inter,sans-serif;"
+                          transform="rotate(90,80,80)">{total}</text>
+                    <text x="80" y="100" text-anchor="middle"
+                          style="fill:var(--text-tertiary);font-size:0.55rem;font-family:Inter,sans-serif;"
+                          transform="rotate(90,80,80)">TOTAL</text>
+                </svg>
+                <div class="donut-legend">
+                    {legend_items}
+                </div>
+            </div>
+        </div>'''
+
+
+def _generate_findings(findings: list, empty_message: Optional[str] = None, severity_class: str = "") -> str:
     """Generate HTML for findings list with severity detection"""
     if not findings:
         return f'''
@@ -1172,12 +1707,13 @@ def _generate_findings(findings, empty_message=None, severity_class=""):
             </div>
         '''
 
-    html = ''
+    import html as _html
+    result = ''
     for finding in findings:
         # Auto-detect severity from content
         detected_severity = severity_class
         finding_lower = finding.lower()
-        
+
         if not detected_severity:
             if 'critical' in finding_lower or 'ms17-010' in finding_lower or 'eternalblue' in finding_lower:
                 detected_severity = 'critical'
@@ -1185,17 +1721,24 @@ def _generate_findings(findings, empty_message=None, severity_class=""):
                 detected_severity = 'high'
             elif 'medium' in finding_lower or 'warning' in finding_lower:
                 detected_severity = 'medium'
-        
-        # Escape HTML and truncate if too long
-        safe_finding = finding.replace('<', '&lt;').replace('>', '&gt;')
+
+        # Escape HTML entities to prevent XSS and truncate if too long
+        safe_finding = _html.escape(finding, quote=True)
         if len(safe_finding) > 500:
             safe_finding = safe_finding[:497] + '...'
-        
-        html += f'<div class="finding-item {detected_severity}"><pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">{safe_finding}</pre></div>\n'
-    
-    return html
 
-def _generate_services_table(services, critical_services):
+        result += (
+            f'<div class="finding-item {detected_severity}" role="listitem">'
+            f'<div class="finding-header">'
+            f'<pre class="finding-text">{safe_finding}</pre>'
+            f'<button class="copy-btn" aria-label="Copy finding to clipboard">Copy</button>'
+            f'</div>'
+            f'</div>\n'
+        )
+
+    return result
+
+def _generate_services_table(services: list, critical_services: list) -> str:
     """Generate HTML table for services"""
     if not services:
         return '''
@@ -1205,21 +1748,22 @@ def _generate_services_table(services, critical_services):
             </div>
         '''
 
+    import html as _html
     critical_ports = ['445', '3389', '22', '21', '23', '1433', '3306', '5432']
-    
-    html = '<table class="services-table">'
-    html += '<thead><tr><th>Service Information</th><th>Status</th></tr></thead>'
-    html += '<tbody>'
-    
+
+    result = '<table class="services-table" role="table" aria-label="Detected services">'
+    result += '<thead><tr><th scope="col">Service Information</th><th scope="col">Status</th></tr></thead>'
+    result += '<tbody>'
+
     for service in services:
         is_critical = any(port in service for port in critical_ports)
         badge = '<span class="service-badge critical">CRITICAL</span>' if is_critical else ''
-        safe_service = service.replace('<', '&lt;').replace('>', '&gt;')
-        html += f'<tr><td>{safe_service}</td><td>{badge}</td></tr>\n'
-    
-    html += '</tbody></table>'
-    
-    return html
+        safe_service = _html.escape(service, quote=True)
+        result += f'<tr><td>{safe_service}</td><td>{badge}</td></tr>\n'
+
+    result += '</tbody></table>'
+
+    return result
 
 if __name__ == '__main__':
     if len(sys.argv) < 6:
