@@ -73,6 +73,8 @@ remove_executable() {
         echo -e "${GREEN}[OK]${NC} Removed /usr/local/bin/html_generator.py"
     sudo rm -rf /usr/local/bin/report 2>/dev/null && \
         echo -e "${GREEN}[OK]${NC} Removed report package"
+    sudo rm -rf /usr/local/bin/lib 2>/dev/null && \
+        echo -e "${GREEN}[OK]${NC} Removed lib modules"
 }
 
 remove_desktop_entry() {

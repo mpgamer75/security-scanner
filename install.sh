@@ -491,22 +491,50 @@ install_scanner() {
     # The package must sit next to html_generator.py so it can be imported.
     install_report_package
 
+    # Download the lib/ bash modules (targeting/evasion/scan/parallel). They must
+    # sit next to the security script so it can source them at runtime.
+    install_lib_modules
+
     # Make executable
     chmod +x security
     chmod +x html_generator.py 2>/dev/null
 
-    # Install globally. The report/ package is installed alongside the generator
-    # in /usr/local/bin so html_generator.py can import it from any directory.
+    # Install globally. report/ and lib/ are installed alongside the scripts in
+    # /usr/local/bin so they can be found from any working directory.
     if sudo mv security /usr/local/bin/ && sudo mv html_generator.py /usr/local/bin/ 2>/dev/null; then
         if [ -d report ]; then
             sudo rm -rf /usr/local/bin/report 2>/dev/null
             sudo cp -r report /usr/local/bin/report && rm -rf report
+        fi
+        if [ -d lib ]; then
+            sudo rm -rf /usr/local/bin/lib 2>/dev/null
+            sudo cp -r lib /usr/local/bin/lib && rm -rf lib
         fi
         echo -e "${GREEN}[SUCCESS]${NC} Security Scanner installed successfully!"
         echo -e "${WHITE}You can now run:${NC} ${CYAN}security${NC}"
     else
         echo -e "${RED}[ERROR]${NC} Installation failed"
         exit 1
+    fi
+}
+
+# Fetch the lib/ bash modules. Prefer a local copy; otherwise download them.
+install_lib_modules() {
+    if [ -d lib ] && [ -f lib/scan.sh ]; then
+        echo -e "${GREEN}[OK]${NC} lib/ modules present locally"
+        return 0
+    fi
+    echo -e "${CYAN}[INFO]${NC} Downloading lib/ modules..."
+    local base="https://raw.githubusercontent.com/mpgamer75/security-scanner/main/lib"
+    mkdir -p lib
+    local ok=true
+    for f in targeting evasion scan parallel; do
+        if ! curl -sSL "$base/$f.sh" -o "lib/$f.sh"; then ok=false; fi
+    done
+    if [ "$ok" = true ]; then
+        echo -e "${GREEN}[OK]${NC} lib/ modules downloaded"
+    else
+        echo -e "${YELLOW}[WARNING]${NC} Some lib/ modules failed to download; scanner will use degraded defaults"
     fi
 }
 

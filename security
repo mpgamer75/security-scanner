@@ -27,7 +27,7 @@ DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-VERSION="2.3.3"
+VERSION="2.4.0"
 
 # Vars globales du script
 SCAN_INTERRUPTED=false
@@ -39,6 +39,9 @@ DOMAIN=""
 QUICK_MODE=false
 STEALTH_MODE=false
 AGGRESSIVE_MODE=false
+EVASION_OVERRIDE=""   # --evasion none|low|med|high (empty = derive from mode)
+TARGET_TYPE=""        # ip|ipv6|cidr|hostname|url (set by profile_target)
+MAX_PARALLEL=4        # bounded concurrency for independent scan steps
 
 # Timeouts ajustés - optimisés pour fiabilité et performance
 TIMEOUT_VERY_SHORT=15
@@ -46,6 +49,51 @@ TIMEOUT_SHORT=30
 TIMEOUT_MEDIUM=120
 TIMEOUT_LONG=900        # 15 min - aligné avec nmap --host-timeout 15m
 TIMEOUT_VERY_LONG=1200  # 20 min - pour scans de vulnérabilités complexes
+
+# Charge les modules lib/ (targeting, evasion, scan, parallel). Ils sont
+# installés à côté du script. Fallbacks minimalistes si lib/ est absent.
+_SCRIPT_SRC="${BASH_SOURCE[0]:-$0}"
+_SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$_SCRIPT_SRC" 2>/dev/null || echo "$_SCRIPT_SRC")")" 2>/dev/null && pwd)"
+for _lib in targeting evasion scan parallel; do
+    if [ -f "$_SCRIPT_DIR/lib/$_lib.sh" ]; then
+        # shellcheck disable=SC1090
+        source "$_SCRIPT_DIR/lib/$_lib.sh"
+    fi
+done
+# Fallbacks (degraded, but never crash) if the lib modules are missing.
+if ! command -v build_port_scan_args >/dev/null 2>&1; then
+    echo -e "${YELLOW}[WARN]${NC} lib/ modules not found next to script; using degraded defaults" >&2
+    is_root() { [ "$(id -u 2>/dev/null || echo 1000)" -eq 0 ]; }
+    nmap_scan_flag() { [ "${1:-0}" -eq 1 ] 2>/dev/null && echo "-sS" || echo "-sT"; }
+    nmap_base_flags() { echo "-Pn -n --open"; }
+    nmap_timing_flags() { case "$1" in quick|aggressive) echo "-T5";; stealth) echo "-T1";; *) echo "-T4";; esac; }
+    nmap_evasion_flags() { echo ""; }
+    mode_to_evasion() { echo none; }
+    waf_evasion_profile() { echo low; }
+    gobuster_evasion_flags() { echo ""; }
+    nuclei_evasion_flags() { echo ""; }
+    host_discovery_flags() { echo ""; }
+    profile_target() { echo unknown; }
+    target_host() { echo "$1"; }
+    target_plan() { echo "osint network web"; }
+    build_port_scan_args() {
+        echo "$(nmap_scan_flag "$1") $(nmap_base_flags) $(nmap_timing_flags "$2") $4 $5" | tr -s ' '
+    }
+    run_parallel() { local m="$1"; shift; local c; for c in "$@"; do eval "$c"; done; }
+fi
+
+# active_mode : normalize the boolean flags into a single mode name.
+active_mode() {
+    if [ "$QUICK_MODE" = true ]; then echo quick
+    elif [ "$STEALTH_MODE" = true ]; then echo stealth
+    elif [ "$AGGRESSIVE_MODE" = true ]; then echo aggressive
+    else echo standard; fi
+}
+
+# active_evasion : the evasion profile in effect (override or derived from mode).
+active_evasion() {
+    if [ -n "$EVASION_OVERRIDE" ]; then echo "$EVASION_OVERRIDE"; else mode_to_evasion "$(active_mode)"; fi
+}
 
 display_banner() {
     clear
@@ -91,11 +139,21 @@ USAGE:
     security [OPTIONS]
 
 OPTIONS:
-    -h, --help       Show this help message
-    -v, --version    Show version information
-    -q, --quick      Quick scan mode (3x faster, reduced coverage)
-    -s, --stealth    Stealth mode (IDS/IPS evasion, slower)
-    -a, --aggressive Aggressive mode (full coverage, all ports)
+    -h, --help          Show this help message
+    -v, --version       Show version information
+    -q, --quick         Quick scan mode (3x faster, reduced coverage)
+    -s, --stealth       Stealth mode (real IDS/IPS evasion: decoys, timing,
+                        fragmentation, source-port, capped rate)
+    -a, --aggressive    Aggressive mode (full coverage, all ports)
+    -t, --target VAL    Target: IP / CIDR / hostname / URL (skips the prompt)
+    -u, --url VAL       Target URL for web testing
+    -d, --domain VAL    Target domain for OSINT
+    --evasion LEVEL     Override evasion: none | low | med | high
+    --max-parallel N    Max concurrent independent scan steps (default 4)
+    -y, --yes           Non-interactive: run the full assessment without prompts
+
+TARGET TYPES (auto-detected and adapted):
+    IP (10.0.0.5), CIDR (10.0.0.0/24), hostname (example.com), URL, IPv6.
 
 SCAN TYPES:
     1. OSINT & Information Gathering
@@ -475,37 +533,36 @@ run_network_scans() {
     echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
     echo
     
-    # Config des paramètres nmap selon le mode choisi - optimisé pour efficacité maximale
-    local nmap_timing="-T4"
-    local port_range="--top-ports 3000"  # Augmenté de 2000 à 3000 pour meilleure couverture
-    local max_retries="--max-retries 2"  # Augmenté de 1 à 2 pour meilleure détection
-    local min_rate="--min-rate 3000"     # Augmenté de 2000 à 3000 pour plus de performance
-    local host_timeout="--host-timeout 10m"  # Timeout par hôte plus flexible
-    
-    if [ "$QUICK_MODE" = true ]; then
-        nmap_timing="-T5"
-        port_range="--top-ports 1000"
-        max_retries="--max-retries 1"
-        min_rate="--min-rate 5000"
-        host_timeout="--host-timeout 5m"
-    elif [ "$STEALTH_MODE" = true ]; then
-        nmap_timing="-T2"
-        port_range="--top-ports 1500"
-        max_retries="--max-retries 3"
-        min_rate="--min-rate 500"
-        host_timeout="--host-timeout 20m"
-    elif [ "$AGGRESSIVE_MODE" = true ]; then
-        nmap_timing="-T5"
-        port_range="-p-"  # Tous les ports
-        max_retries="--max-retries 2"
-        min_rate="--min-rate 10000"  # Très rapide
-        host_timeout="--host-timeout 15m"
+    # Paramètres selon le mode + profil d'évasion (lib/evasion.sh, lib/scan.sh)
+    local mode; mode="$(active_mode)"
+    local evasion; evasion="$(active_evasion)"
+    local nmap_timing; nmap_timing="$(nmap_timing_flags "$mode")"
+    local port_range="--top-ports 3000"
+    local host_timeout="--host-timeout 10m"
+    local max_retries="--max-retries 2"
+    case "$mode" in
+        quick)      port_range="--top-ports 1000"; host_timeout="--host-timeout 5m";  max_retries="--max-retries 1" ;;
+        stealth)    port_range="--top-ports 1500"; host_timeout="--host-timeout 20m"; max_retries="--max-retries 2" ;;
+        aggressive) port_range="-p-";              host_timeout="--host-timeout 15m"; max_retries="--max-retries 2" ;;
+    esac
+
+    # Détection du privilège : -sS (root) sinon repli -sT (fixe le bug du scan
+    # marqué [DONE] alors qu'il ne trouvait aucun port sans privilège).
+    local root=0
+    is_root && root=1
+    [ "$root" -eq 0 ] && echo -e "${YELLOW}[INFO]${NC} Non-root: TCP connect scan (-sT). Use sudo for -sS / UDP / OS detection."
+    echo -e "${CYAN}[INFO]${NC} Mode: ${WHITE}$mode${NC} ${GRAY}|${NC} Evasion: ${WHITE}$evasion${NC} ${GRAY}|${NC} Target type: ${WHITE}${TARGET_TYPE:-ip}${NC}"
+
+    # Découverte des hosts : vrai balayage pour un CIDR (sans -Pn), sinon le scan
+    # de ports -Pn suffit (remplace l'ancien no-op `nmap -Pn -sn`).
+    local disc_flags; disc_flags="$(host_discovery_flags "$TARGET_TYPE")"
+    if [ -n "$disc_flags" ]; then
+        execute_scan "Host Discovery (sweep)" \
+            "nmap $disc_flags '$target' 2>/dev/null || echo 'Discovery failed'" \
+            $TIMEOUT_MEDIUM "$OUTDIR/network/host_discovery.txt"
+    else
+        echo "Single host $target — port scan uses -Pn (assumed reachable)" > "$OUTDIR/network/host_discovery.txt"
     fi
-    
-    # Découverte des hosts - on force -Pn pour éviter les blocages
-    execute_scan "Host Discovery" \
-        "nmap -Pn -sn $nmap_timing $min_rate '$target' 2>/dev/null || echo 'Host: $target (assuming online)'" \
-        $TIMEOUT_SHORT "$OUTDIR/network/host_discovery.txt"
     
     # RustScan si dispo - c'est hyper rapide ce truc
     if command -v rustscan &> /dev/null && [ "$QUICK_MODE" = true ]; then
@@ -521,10 +578,11 @@ run_network_scans() {
             $TIMEOUT_LONG "$OUTDIR/network/masscan.txt"
     fi
     
-    # Scan de ports principal - optimisé avec -Pn toujours activé
-    execute_scan "Port Scanning (TCP SYN)" \
-        "nmap -Pn -sS $nmap_timing $port_range $min_rate $max_retries \
-         $host_timeout --defeat-rst-ratelimit '$target'" \
+    # Scan de ports principal - privilège-aware + évasion (lib/scan.sh).
+    # --defeat-rst-ratelimit n'est plus appliqué qu'en mode agressif.
+    local port_scan_args; port_scan_args="$(build_port_scan_args "$root" "$mode" "$evasion" "$port_range" "$host_timeout")"
+    execute_scan "Port Scanning (TCP)" \
+        "nmap $port_scan_args '$target'" \
         $TIMEOUT_LONG "$OUTDIR/network/nmap_ports.txt" true
     
     # Détection des services et versions qui tournent - version intensity augmentée
@@ -713,11 +771,18 @@ run_web_scans() {
             $TIMEOUT_MEDIUM "$OUTDIR/web/whatweb.txt"
     fi
     
-    # Détection de WAF avec wafw00f
+    # Détection de WAF avec wafw00f + adaptation de l'évasion web
+    local web_evasion; web_evasion="$(active_evasion)"
     if command -v wafw00f &> /dev/null; then
         execute_scan "WAF Detection (wafw00f)" \
             "wafw00f '$url' 2>/dev/null || echo 'wafw00f failed'" \
             $TIMEOUT_SHORT "$OUTDIR/web/wafw00f.txt"
+        # Un WAF détecté => on ralentit + randomise l'UA, sinon on se fait blacklister.
+        if [ -f "$OUTDIR/web/wafw00f.txt" ] && grep -qi "is behind" "$OUTDIR/web/wafw00f.txt"; then
+            local waf_name; waf_name="$(grep -i 'is behind' "$OUTDIR/web/wafw00f.txt" | head -1)"
+            web_evasion="$(waf_evasion_profile "$waf_name")"
+            echo -e "${YELLOW}[WAF]${NC} WAF detected — web evasion raised to ${WHITE}${web_evasion}${NC}"
+        fi
     fi
     
     # Analyse SSL/TLS complète (certif, ciphers, vulns)
@@ -754,9 +819,13 @@ run_web_scans() {
             threads=100
             extensions="php,html,txt,js,css,json,xml,asp,aspx,jsp"
         fi
-        
+
+        # Sous WAF/évasion élevée : baisser les threads et ajouter delay + UA aléatoire
+        local gob_evasion; gob_evasion="$(gobuster_evasion_flags "$web_evasion")"
+        [ "$web_evasion" = "high" ] && threads=10
+
         execute_scan "Directory Enumeration (Common)" \
-            "gobuster dir -u '$url' -w '$wordlist_dir/common.txt' -t $threads \
+            "gobuster dir -u '$url' -w '$wordlist_dir/common.txt' -t $threads $gob_evasion \
              -x $extensions -q --timeout 10s --no-error 2>/dev/null | head -300 || echo 'Gobuster failed'" \
             $TIMEOUT_LONG "$OUTDIR/web/gobuster_common.txt"
         
@@ -787,6 +856,15 @@ run_web_scans() {
             template_timeout="45"
         fi
 
+        # WAF / évasion élevée : throttle nuclei pour éviter blocage/blacklist
+        local concurrency=20
+        local nuclei_extra=""
+        if [ "$web_evasion" = "high" ]; then
+            rate_limit=10; concurrency=10; nuclei_extra="-jitter 30"
+        elif [ "$web_evasion" = "med" ]; then
+            rate_limit=40; concurrency=15
+        fi
+
         # Update templates in background (non-blocking)
         echo -e "${CYAN}[INFO]${NC} Updating Nuclei templates..."
         (nuclei -update-templates -silent &>/dev/null &)
@@ -796,7 +874,7 @@ run_web_scans() {
         execute_scan "Vulnerability Scanning (Nuclei)" \
             "if timeout $nuclei_timeout nuclei -u '$url' $severity -silent \
                 -timeout $template_timeout -retries 2 \
-                -rate-limit $rate_limit -concurrency 20 \
+                -rate-limit $rate_limit -concurrency $concurrency $nuclei_extra \
                 -no-interactsh -no-color \
                 -stats -stats-interval 30 2>&1 | head -200; then
                 echo 'Nuclei scan completed successfully'
@@ -1657,22 +1735,55 @@ main() {
             -q|--quick) QUICK_MODE=true; AUTO_MODE=true; shift ;;
             -s|--stealth) STEALTH_MODE=true; AUTO_MODE=true; shift ;;
             -a|--aggressive) AGGRESSIVE_MODE=true; AUTO_MODE=true; shift ;;
+            -t|--target) TARGET="${2:-}"; shift 2 ;;
+            -u|--url) URL="${2:-}"; shift 2 ;;
+            -d|--domain) DOMAIN="${2:-}"; shift 2 ;;
+            --evasion) EVASION_OVERRIDE="${2:-}"; shift 2 ;;
+            --max-parallel) MAX_PARALLEL="${2:-4}"; shift 2 ;;
+            -y|--yes) AUTO_MODE=true; shift ;;
             *) echo "Unknown option: $1"; exit 1 ;;
         esac
     done
+
+    # Validate --evasion
+    case "${EVASION_OVERRIDE:-}" in
+        ""|none|low|med|high) ;;
+        *) echo "Invalid --evasion '$EVASION_OVERRIDE' (use none|low|med|high)"; exit 1 ;;
+    esac
     
     trap 'handle_interrupt' SIGINT SIGTERM
     
     display_banner
     
-    echo -e "${ORANGE}Target Configuration:${NC}"
-    read -rp "$(echo -e ${WHITE}IP:${NC} )" TARGET
-    [ -z "$TARGET" ] && { echo -e "${RED}[ERROR]${NC} IP required"; exit 1; }
-    
-    read -rp "$(echo -e ${WHITE}URL \(optional\):${NC} )" URL
-    read -rp "$(echo -e ${WHITE}Domain \(optional\):${NC} )" DOMAIN
-    
+    if [ -z "$TARGET" ]; then
+        echo -e "${ORANGE}Target Configuration:${NC}"
+        read -rp "$(echo -e ${WHITE}Target \(IP/CIDR/host/URL\):${NC} )" TARGET
+    fi
+    [ -z "$TARGET" ] && { echo -e "${RED}[ERROR]${NC} Target required"; exit 1; }
+
+    if [ -z "$URL" ] && [ "$AUTO_MODE" != true ]; then
+        read -rp "$(echo -e ${WHITE}URL \(optional\):${NC} )" URL
+    fi
+    if [ -z "$DOMAIN" ] && [ "$AUTO_MODE" != true ]; then
+        read -rp "$(echo -e ${WHITE}Domain \(optional\):${NC} )" DOMAIN
+    fi
+
+    # Profil de la cible : classifie et adapte la stratégie (IP/CIDR/host/URL)
+    TARGET_TYPE="$(profile_target "$TARGET")"
+    if [ "$TARGET_TYPE" = "unknown" ]; then
+        echo -e "${RED}[ERROR]${NC} Unrecognized target format: $TARGET"
+        exit 1
+    fi
+    # Si la cible est une URL, en déduire URL/DOMAIN et scanner l'hôte extrait
+    if [ "$TARGET_TYPE" = "url" ]; then
+        [ -z "$URL" ] && URL="$TARGET"
+        [ -z "$DOMAIN" ] && DOMAIN="$(target_host "$TARGET")"
+        TARGET="$(target_host "$TARGET")"
+        TARGET_TYPE="$(profile_target "$TARGET")"
+    fi
+
     [ -n "$URL" ] && [ -z "$DOMAIN" ] && DOMAIN=$(echo "$URL" | sed -E 's|https?://([^/]+).*|\1|')
+    echo -e "${CYAN}[TARGET]${NC} ${WHITE}$TARGET${NC} ${GRAY}(type: ${TARGET_TYPE})${NC}"
     
     # Si un mode automatique est activé (-q, -s, -a), on lance directement le scan complet
     if [ "$AUTO_MODE" = true ]; then
@@ -1737,4 +1848,7 @@ main() {
     echo
 }
 
-main "$@"
+# Run main only when executed directly (allows sourcing for tests).
+if [ "${BASH_SOURCE[0]:-$0}" = "${0}" ]; then
+    main "$@"
+fi
