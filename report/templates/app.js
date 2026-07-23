@@ -138,6 +138,14 @@
       download("assessment.json", JSON.stringify(data, null, 2), "application/json");
     });
   }
+  var navBtn = document.getElementById("export-navigator");
+  var navEl = document.getElementById("navigator-data");
+  if (navBtn && navEl) {
+    navBtn.addEventListener("click", function () {
+      download("navigator.json", navEl.textContent, "application/json");
+    });
+  }
+
   var mdBtn = document.getElementById("copy-markdown");
   if (mdBtn) {
     mdBtn.addEventListener("click", function () {

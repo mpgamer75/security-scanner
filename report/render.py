@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 from typing import Dict, List
 
+from . import mitre
 from . import severity as sev
 from .models import Assessment, Finding, Severity
 
@@ -296,6 +297,35 @@ def _surface(assessment: Assessment) -> str:
     return "".join(blocks)
 
 
+def _mitre_matrix(findings: List[Finding]) -> str:
+    cov = mitre.coverage(findings)
+    if not cov:
+        return '<div class="empty-hint">No ATT&amp;CK techniques recorded.</div>'
+    order = ["TA0043", "TA0042", "TA0001"]
+    tactics = [t for t in order if t in cov] + [t for t in cov if t not in order]
+    cols = []
+    for tactic in tactics:
+        entry = cov[tactic]
+        cells = []
+        for tid, data in sorted(entry["techniques"].items()):
+            indicated = " indicated" if tactic == "TA0001" else ""
+            cells.append(
+                '<a class="tech-cell%s" href="%s" target="_blank" rel="noopener" '
+                'title="%s findings">'
+                '<span class="mono tech-id">%s</span>'
+                '<span class="tech-name">%s</span>'
+                '<span class="c num">%d</span></a>'
+                % (indicated, mitre.technique_url(tid), data["count"],
+                   _esc(tid), _esc(data["name"]), data["count"])
+            )
+        cols.append(
+            '<div class="matrix-col"><div class="matrix-tactic">'
+            '<span class="mono">%s</span> %s</div>%s</div>'
+            % (_esc(tactic), _esc(entry["name"]), "".join(cells))
+        )
+    return '<div class="matrix">%s</div>' % "".join(cols)
+
+
 def _osint(assessment: Assessment) -> str:
     a = assessment.assets
     cards = []
@@ -415,6 +445,14 @@ def render_json(assessment: Assessment) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
+def render_navigator(assessment: Assessment) -> str:
+    """ATT&CK Navigator layer JSON (loadable at mitre-attack.github.io/attack-navigator)."""
+    layer = mitre.navigator_layer(
+        assessment.findings, name="security-scanner: %s" % (assessment.target or "target")
+    )
+    return json.dumps(layer, indent=2, ensure_ascii=False)
+
+
 def render_markdown(assessment: Assessment) -> str:
     risk = sev.risk_score(assessment.findings)
     counts = _severity_counts(assessment.findings)
@@ -476,8 +514,11 @@ def render_html(assessment: Assessment) -> str:
     app_js = _load_asset("app.js")
 
     # Embedded machine-readable data (escape < > & so it can't break out of <script>).
-    payload = render_json(assessment)
-    payload_safe = payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    def _script_safe(text: str) -> str:
+        return text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+    payload_safe = _script_safe(render_json(assessment))
+    navigator_safe = _script_safe(render_navigator(assessment))
     markdown_safe = _esc(render_markdown(assessment))
 
     dossier = ['<div><span class="k">Target</span><span class="v">%s</span></div>' % _esc(assessment.target)]
@@ -520,16 +561,19 @@ def render_html(assessment: Assessment) -> str:
         '<main class="layout wrap">\n%(spine)s\n<div class="content">\n'
         '<section id="findings"><div class="section-head"><h2><span class="idx">01</span>Findings</h2>'
         '<span class="meta">%(nfind)d total</span></div>%(findings)s</section>\n'
-        '<section id="surface"><div class="section-head"><h2><span class="idx">02</span>Attack Surface</h2>'
+        '<section id="attack"><div class="section-head"><h2><span class="idx">02</span>ATT&amp;CK Coverage</h2>'
+        '<button class="btn" id="export-navigator">Export ATT&amp;CK Layer</button></div>%(matrix)s</section>\n'
+        '<section id="surface"><div class="section-head"><h2><span class="idx">03</span>Attack Surface</h2>'
         '<span class="meta">%(nports)d services</span></div>%(surface)s</section>\n'
-        '<section id="osint"><div class="section-head"><h2><span class="idx">03</span>OSINT &amp; Assets</h2></div>%(osint)s</section>\n'
-        '<section id="guidance"><div class="section-head"><h2><span class="idx">04</span>Exploitation Guidance</h2>'
-        '<span class="meta">indication only</span></div>%(guidance)s</section>\n'
-        '<section id="recommendations"><div class="section-head"><h2><span class="idx">05</span>Recommendations</h2></div>%(recs)s</section>\n'
+        '<section id="osint"><div class="section-head"><h2><span class="idx">04</span>OSINT &amp; Assets</h2></div>%(osint)s</section>\n'
+        '<section id="guidance"><div class="section-head"><h2><span class="idx">05</span>Exploitation Guidance</h2>'
+        '<span class="meta">indication only · authorized ROE</span></div>%(guidance)s</section>\n'
+        '<section id="recommendations"><div class="section-head"><h2><span class="idx">06</span>Recommendations</h2></div>%(recs)s</section>\n'
         "</div>\n</main>\n"
         '<footer class="foot wrap"><span>Security Scanner v%(version)s · Red Team Field Report</span>'
         "<span>Generated %(gen)s · Authorized testing only</span></footer>\n"
         '<script id="report-data" type="application/json">%(payload)s</script>\n'
+        '<script id="navigator-data" type="application/json">%(navigator)s</script>\n'
         '<pre id="markdown-source" hidden>%(markdown)s</pre>\n'
         "<script>%(app)s</script>\n</body>\n</html>\n"
         % {
@@ -541,6 +585,7 @@ def render_html(assessment: Assessment) -> str:
             "attack": _attack_strip(assessment.findings),
             "spine": _spine(counts, total_findings),
             "findings": _findings_table(assessment.findings),
+            "matrix": _mitre_matrix(assessment.findings),
             "surface": _surface(assessment),
             "osint": _osint(assessment),
             "guidance": _guidance(assessment.findings),
@@ -550,6 +595,7 @@ def render_html(assessment: Assessment) -> str:
             "version": _esc(assessment.version),
             "gen": _esc(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             "payload": payload_safe,
+            "navigator": navigator_safe,
             "markdown": markdown_safe,
             "app": app_js,
         }

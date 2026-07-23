@@ -44,6 +44,7 @@ def main(argv):
     html_path = os.path.join(reports_dir, "assessment.html")
     json_path = os.path.join(reports_dir, "assessment.json")
     md_path = os.path.join(reports_dir, "assessment.md")
+    nav_path = os.path.join(reports_dir, "navigator.json")
 
     with open(html_path, "w", encoding="utf-8") as handle:
         handle.write(render.render_html(assessment))
@@ -51,11 +52,14 @@ def main(argv):
         handle.write(render.render_json(assessment))
     with open(md_path, "w", encoding="utf-8") as handle:
         handle.write(render.render_markdown(assessment))
+    with open(nav_path, "w", encoding="utf-8") as handle:
+        handle.write(render.render_navigator(assessment))
 
     findings = len(assessment.findings)
     print("[SUCCESS] HTML Report: %s (%d findings)" % (html_path, findings))
     print("[INFO] JSON: %s" % json_path)
     print("[INFO] Markdown: %s" % md_path)
+    print("[INFO] ATT&CK Navigator layer: %s" % nav_path)
     print("[INFO] Open in browser: file://%s" % os.path.abspath(html_path))
     return 0
 

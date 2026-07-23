@@ -122,6 +122,29 @@ class TestRenderHtmlContent(unittest.TestCase):
         self.assertIn("10.0.0.9", html)
 
 
+class TestRenderMitre(unittest.TestCase):
+    def test_coverage_matrix_present(self):
+        html = render.render_html(_sample())
+        self.assertIn("ATT&amp;CK", html)
+        self.assertIn("Reconnaissance", html)  # tactic name in the matrix
+        self.assertIn("T1595.002", html)
+
+    def test_navigator_layer_embedded_and_valid(self):
+        html = render.render_html(_sample())
+        match = re.search(
+            r'<script id="navigator-data" type="application/json">(.*?)</script>',
+            html, re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        layer = json.loads(match.group(1).replace("\\u003c", "<"))
+        self.assertEqual(layer["domain"], "enterprise-attack")
+        self.assertTrue(layer["techniques"])
+
+    def test_render_navigator_is_valid_json(self):
+        layer = json.loads(render.render_navigator(_sample()))
+        self.assertEqual(layer["domain"], "enterprise-attack")
+
+
 class TestRenderJson(unittest.TestCase):
     def test_valid_json_with_risk(self):
         data = json.loads(render.render_json(_sample()))
