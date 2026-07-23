@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: security-scanner:2.4.0
+    container_name: security-scanner
+    # Allow raw socket access for nmap/masscan
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # Mount output directory for results
+    volumes:
+      - ./output:/scanner/output
+    # Use host network for scanning (optional, enables full network access)
+    # network_mode: host
+    environment:
+      - TERM=xterm-256color
+    # Interactive mode for the CLI
+    stdin_open: true
+    tty: true
+    # Remove container after completion (use 'restart: unless-stopped' for daemon mode)
+    # restart: unless-stopped
+
+# Named volume for persistent output
+volumes:
+  scanner-output:
+    driver: local

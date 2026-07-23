@@ -1,0 +1,110 @@
+# =============================================================================
+# Security Scanner v2.4.0 - Configuration File Example
+# =============================================================================
+# Copy this file to ~/.security-scanner/config.yml and edit as needed.
+# Settings in this file override the script defaults.
+#
+# Usage: The scanner will auto-detect this file on startup.
+#
+# IMPORTANT: This tool is for AUTHORIZED penetration testing ONLY.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Scan Timeouts (seconds)
+# ---------------------------------------------------------------------------
+timeouts:
+  very_short: 15    # Quick checks (ping, whois)
+  short: 30         # DNS, crt.sh queries
+  medium: 120       # Port scans (quick mode)
+  long: 900         # Vulnerability scans (15 minutes)
+  very_long: 1200   # Complex scans (20 minutes)
+
+# ---------------------------------------------------------------------------
+# Default Scan Mode
+# Options: standard | quick | stealth | aggressive
+# ---------------------------------------------------------------------------
+default_mode: standard
+
+# ---------------------------------------------------------------------------
+# Wordlists
+# ---------------------------------------------------------------------------
+wordlists:
+  common: /usr/share/wordlists/dirb/common.txt
+  big: /usr/share/wordlists/dirb/big.txt
+  # custom: /path/to/your/custom.txt
+
+# ---------------------------------------------------------------------------
+# API Keys (optional - enhance OSINT capabilities)
+# ---------------------------------------------------------------------------
+api_keys:
+  # Shodan - network intelligence and device search
+  # Get your key at: https://account.shodan.io/
+  shodan: ""
+
+  # Hunter.io - email harvesting
+  # Get your key at: https://hunter.io/api
+  hunter: ""
+
+  # VirusTotal - malware and URL analysis
+  # Get your key at: https://www.virustotal.com/gui/my-apikey
+  virustotal: ""
+
+# ---------------------------------------------------------------------------
+# Scan Profiles (custom scan configurations)
+# ---------------------------------------------------------------------------
+profiles:
+  # Quick web-only scan
+  web_quick:
+    mode: quick
+    modules: [web]
+    timeout_multiplier: 0.5
+
+  # Full stealth assessment
+  full_stealth:
+    mode: stealth
+    modules: [osint, network, web]
+    timeout_multiplier: 2.0
+
+  # Aggressive internal network scan
+  internal_network:
+    mode: aggressive
+    modules: [network]
+    timeout_multiplier: 1.5
+
+# ---------------------------------------------------------------------------
+# Output Settings
+# ---------------------------------------------------------------------------
+output:
+  # Base directory for scan results (default: current directory)
+  # base_dir: ~/security-scans
+
+  # Keep results for N days (0 = keep forever)
+  retention_days: 0
+
+  # File permissions for output (077 = owner-only, recommended)
+  umask: "077"
+
+  # Generate HTML report automatically
+  html_report: true
+
+  # Generate JSON report automatically
+  json_report: true
+
+# ---------------------------------------------------------------------------
+# Notification Settings (optional)
+# ---------------------------------------------------------------------------
+notifications:
+  # Play terminal bell on scan completion
+  completion_sound: false
+
+  # Slack webhook URL for scan completion notifications
+  # slack_webhook: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+# ---------------------------------------------------------------------------
+# Tool Paths (override auto-detection)
+# ---------------------------------------------------------------------------
+tools:
+  # nmap: /usr/bin/nmap
+  # masscan: /usr/bin/masscan
+  # subfinder: /root/go/bin/subfinder
+  # nuclei: /root/go/bin/nuclei
