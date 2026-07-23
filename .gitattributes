@@ -1,0 +1,20 @@
+# This is a Linux tool: CRLF line endings break the bash scripts (they are run
+# via `curl | bash`, sourced with `source lib/*.sh`, and executed on Linux).
+# Force LF for all text files so checkouts are correct regardless of platform.
+* text=auto eol=lf
+
+security       text eol=lf
+*.sh           text eol=lf
+*.py           text eol=lf
+*.css          text eol=lf
+*.js           text eol=lf
+*.md           text eol=lf
+*.json         text eol=lf
+*.txt          text eol=lf
+
+# Binary assets (never touch line endings)
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
