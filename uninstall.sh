@@ -67,6 +67,12 @@ remove_executable() {
     else
         echo -e "${YELLOW}[INFO]${NC} Executable not found in /usr/local/bin/"
     fi
+
+    # Remove the HTML generator and the report package installed alongside it.
+    sudo rm -f /usr/local/bin/html_generator.py 2>/dev/null && \
+        echo -e "${GREEN}[OK]${NC} Removed /usr/local/bin/html_generator.py"
+    sudo rm -rf /usr/local/bin/report 2>/dev/null && \
+        echo -e "${GREEN}[OK]${NC} Removed report package"
 }
 
 remove_desktop_entry() {
@@ -274,7 +280,7 @@ main() {
     remove_go_tools
     clean_scan_results
     remove_config_files
-    remove_wordlists
+    remove_custom_wordlists
     
     echo
     echo "================================================================"

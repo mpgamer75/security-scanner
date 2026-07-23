@@ -487,17 +487,56 @@ install_scanner() {
         echo -e "${YELLOW}[INFO]${NC} HTML reports will not be available"
     fi
 
+    # Download the report package (parsers + findings model + renderer).
+    # The package must sit next to html_generator.py so it can be imported.
+    install_report_package
+
     # Make executable
     chmod +x security
     chmod +x html_generator.py 2>/dev/null
 
-    # Install globally
+    # Install globally. The report/ package is installed alongside the generator
+    # in /usr/local/bin so html_generator.py can import it from any directory.
     if sudo mv security /usr/local/bin/ && sudo mv html_generator.py /usr/local/bin/ 2>/dev/null; then
+        if [ -d report ]; then
+            sudo rm -rf /usr/local/bin/report 2>/dev/null
+            sudo cp -r report /usr/local/bin/report && rm -rf report
+        fi
         echo -e "${GREEN}[SUCCESS]${NC} Security Scanner installed successfully!"
         echo -e "${WHITE}You can now run:${NC} ${CYAN}security${NC}"
     else
         echo -e "${RED}[ERROR]${NC} Installation failed"
         exit 1
+    fi
+}
+
+# Fetch the report/ package. Prefer a local copy (manual install / git clone);
+# otherwise download the individual modules from the repository.
+install_report_package() {
+    if [ -d report ] && [ -f report/render.py ]; then
+        echo -e "${GREEN}[OK]${NC} Report package present locally"
+        return 0
+    fi
+
+    echo -e "${CYAN}[INFO]${NC} Downloading report package..."
+    local base="https://raw.githubusercontent.com/mpgamer75/security-scanner/main/report"
+    local files=(
+        "__init__.py" "models.py" "severity.py" "collect.py" "render.py" "mitre.py"
+        "parsers/__init__.py" "parsers/nmap.py" "parsers/nuclei.py"
+        "parsers/nikto.py" "parsers/osint.py"
+        "templates/styles.css" "templates/app.js"
+    )
+    mkdir -p report/parsers report/templates
+    local ok=true
+    for f in "${files[@]}"; do
+        if ! curl -sSL "$base/$f" -o "report/$f"; then
+            ok=false
+        fi
+    done
+    if [ "$ok" = true ]; then
+        echo -e "${GREEN}[OK]${NC} Report package downloaded"
+    else
+        echo -e "${YELLOW}[WARNING]${NC} Some report modules failed to download; HTML reports may be degraded"
     fi
 }
 

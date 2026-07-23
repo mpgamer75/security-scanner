@@ -12,6 +12,17 @@ build/
 assessments/
 scans/
 results_*/
+redteam_*/
+security_scan_*/
+
+# Secrets / local config (never commit API keys)
+*.env
+keys.env
+config/security-scanner/
+
+# Test / preview artifacts
+.playwright-mcp/
+report-*.png
 
 # OS
 .DS_Store
