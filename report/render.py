@@ -100,18 +100,21 @@ def _sev_chip(severity: Severity) -> str:
 
 
 def _gauge(score: int, level: str) -> str:
+    # The arc starts at 0 and is animated to `score` by app.js on load (JS reads
+    # data-score); with JS disabled it still shows the number below.
     return (
         '<div class="gauge">'
         '<svg viewBox="0 0 120 72" width="120" height="72" role="img" '
         'aria-label="Risk score %d of 100">'
         '<path d="M8 60 A 52 52 0 0 1 112 60" fill="none" stroke="var(--hair-strong)" '
         'stroke-width="10" stroke-linecap="round"/>'
-        '<path d="M8 60 A 52 52 0 0 1 112 60" fill="none" stroke="var(--sev-%s)" '
-        'stroke-width="10" stroke-linecap="round" pathLength="100" '
-        'stroke-dasharray="%d 100"/></svg>'
-        '<div class="gauge-score num">%d<span style="font-size:1rem;color:var(--ink-3)">/100</span></div>'
+        '<path id="gauge-arc" class="gauge-arc" d="M8 60 A 52 52 0 0 1 112 60" fill="none" '
+        'stroke="var(--sev-%s)" stroke-width="10" stroke-linecap="round" pathLength="100" '
+        'stroke-dasharray="0 100" data-score="%d"/></svg>'
+        '<div class="gauge-score num" id="gauge-score" data-score="%d">%d'
+        '<span style="font-size:1rem;color:var(--ink-3)">/100</span></div>'
         '<div class="gauge-level" style="color:var(--sev-%s)">%s risk</div>'
-        "</div>" % (score, level, score, score, level, level.upper())
+        "</div>" % (score, level, score, score, score, level, level.upper())
     )
 
 
@@ -255,6 +258,7 @@ def _findings_table(findings: List[Finding]) -> str:
         '<input id="finding-search" class="search" type="search" '
         'placeholder="search findings, hosts, CVEs, ATT&amp;CK ids…" aria-label="Search findings">'
         '<div class="filters">%s</div>'
+        '<button class="btn hidden" id="clear-filters">✕ Clear filters</button>'
         '<button class="btn" id="export-json">Export JSON</button>'
         '<button class="btn" id="copy-markdown">Copy Markdown</button>'
         "</div>"
@@ -530,18 +534,23 @@ def render_html(assessment: Assessment) -> str:
     dossier.append('<div><span class="k">Date</span><span class="v">%s</span></div>'
                    % _esc(datetime.now().strftime("%Y-%m-%d %H:%M")))
 
-    statusline = (
-        '<span class="stat"><b>%d</b> CRIT</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> HIGH</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> MED</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> LOW</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> INFO</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> PORTS</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> SUBDOMAINS</span><span class="sep">·</span>'
-        '<span class="stat"><b>%d</b> ATT&amp;CK</span>'
-        % (counts["critical"], counts["high"], counts["medium"], counts["low"],
-           counts["info"], total_ports, n_subs, tactics_touched)
-    )
+    # Each stat is an interactive control: severity stats toggle the findings
+    # filter; the others jump to their section. app.js wires the behaviour;
+    # with JS off they are inert but still readable.
+    def _stat(count: int, label: str, attr: str) -> str:
+        return '<button type="button" class="stat" %s><b>%d</b> %s</button>' % (attr, count, label)
+
+    _sep = '<span class="sep">·</span>'
+    statusline = _sep.join([
+        _stat(counts["critical"], "CRIT", 'data-sev="critical"'),
+        _stat(counts["high"], "HIGH", 'data-sev="high"'),
+        _stat(counts["medium"], "MED", 'data-sev="medium"'),
+        _stat(counts["low"], "LOW", 'data-sev="low"'),
+        _stat(counts["info"], "INFO", 'data-sev="info"'),
+        _stat(total_ports, "PORTS", 'data-jump="surface"'),
+        _stat(n_subs, "SUBDOMAINS", 'data-jump="osint"'),
+        _stat(tactics_touched, "ATT&amp;CK", 'data-jump="attack"'),
+    ])
 
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
@@ -560,7 +569,7 @@ def render_html(assessment: Assessment) -> str:
         "%(attack)s\n"
         '<main class="layout wrap">\n%(spine)s\n<div class="content">\n'
         '<section id="findings"><div class="section-head"><h2><span class="idx">01</span>Findings</h2>'
-        '<span class="meta">%(nfind)d total</span></div>%(findings)s</section>\n'
+        '<span class="meta" id="findings-count" data-total="%(nfind)d">%(nfind)d total</span></div>%(findings)s</section>\n'
         '<section id="attack"><div class="section-head"><h2><span class="idx">02</span>ATT&amp;CK Coverage</h2>'
         '<button class="btn" id="export-navigator">Export ATT&amp;CK Layer</button></div>%(matrix)s</section>\n'
         '<section id="surface"><div class="section-head"><h2><span class="idx">03</span>Attack Surface</h2>'

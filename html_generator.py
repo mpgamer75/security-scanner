@@ -43,13 +43,20 @@ def main(argv):
     os.makedirs(reports_dir, exist_ok=True)
     html_path = os.path.join(reports_dir, "assessment.html")
     json_path = os.path.join(reports_dir, "assessment.json")
+    findings_path = os.path.join(reports_dir, "findings.json")
     md_path = os.path.join(reports_dir, "assessment.md")
     nav_path = os.path.join(reports_dir, "navigator.json")
+
+    structured_json = render.render_json(assessment)
 
     with open(html_path, "w", encoding="utf-8") as handle:
         handle.write(render.render_html(assessment))
     with open(json_path, "w", encoding="utf-8") as handle:
-        handle.write(render.render_json(assessment))
+        handle.write(structured_json)
+    # findings.json is the machine-readable contract from the plan — the same
+    # normalized model as assessment.json under its documented name.
+    with open(findings_path, "w", encoding="utf-8") as handle:
+        handle.write(structured_json)
     with open(md_path, "w", encoding="utf-8") as handle:
         handle.write(render.render_markdown(assessment))
     with open(nav_path, "w", encoding="utf-8") as handle:
@@ -58,6 +65,7 @@ def main(argv):
     findings = len(assessment.findings)
     print("[SUCCESS] HTML Report: %s (%d findings)" % (html_path, findings))
     print("[INFO] JSON: %s" % json_path)
+    print("[INFO] findings.json: %s" % findings_path)
     print("[INFO] Markdown: %s" % md_path)
     print("[INFO] ATT&CK Navigator layer: %s" % nav_path)
     print("[INFO] Open in browser: file://%s" % os.path.abspath(html_path))
