@@ -9,10 +9,14 @@
 run_network_scans() {
     local target="$1"
 
-    echo -e "\n${BRIGHT_RED}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_RED}║${NC}           ${ORANGE}NETWORK RECONNAISSANCE${NC}                ${BRIGHT_RED}║${NC}"
-    echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
-    echo
+    # Step total (keep in sync with the execute_scan calls below).
+    # Always: port, service, os, nse-vuln, critical-vuln, smb, snmp, banner = 8.
+    local _t=8
+    [ -n "$(host_discovery_flags "${TARGET_TYPE:-ip}")" ] && _t=$((_t + 1))     # CIDR host discovery
+    [ "$QUICK_MODE" != true ] && _t=$((_t + 1))                                 # UDP
+    command -v rustscan >/dev/null 2>&1 && [ "$QUICK_MODE" = true ] && _t=$((_t + 1))
+    command -v masscan >/dev/null 2>&1 && [ "$AGGRESSIVE_MODE" = true ] && _t=$((_t + 1))
+    ui_phase_begin "NETWORK RECONNAISSANCE" "$_t"
 
     # Paramètres selon le mode + profil d'évasion (lib/evasion.sh, lib/scan.sh)
     local mode; mode="$(active_mode)"

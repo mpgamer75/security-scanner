@@ -17,6 +17,11 @@ for fn in build_port_scan_args profile_target nmap_evasion_flags run_parallel ac
     assert_eq yes "$(command -v "$fn" >/dev/null 2>&1 && echo yes || echo no)" "fn-$fn"
 done
 
+# UI + config + phase wiring are sourced from lib/ (ui.sh, config.sh) and defined.
+for fn in execute_scan ui_init ui_phase_begin ui_rule run_scan_group config_cmd get_key load_config run_selected_phases; do
+    assert_eq yes "$(command -v "$fn" >/dev/null 2>&1 && echo yes || echo no)" "fn-$fn"
+done
+
 # mode + evasion glue
 QUICK_MODE=false; STEALTH_MODE=false; AGGRESSIVE_MODE=false; EVASION_OVERRIDE=""
 assert_eq standard "$(active_mode)"     "mode-standard"

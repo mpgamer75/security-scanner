@@ -38,3 +38,23 @@ run_parallel() {
     done
     wait
 }
+
+# run_scan_group <name> <cmd> [cmd ...]
+# Run a set of independent execute_scan calls concurrently. Inside a group,
+# execute_scan (lib/ui.sh) drops its shared-line spinner in favour of atomic
+# start/result lines that are safe to interleave. The phase step counter is
+# advanced by the group size afterward so subsequent sequential steps stay
+# consistent.
+run_scan_group() {
+    local name="$1"; shift
+    local count=$#
+    [ "$count" -eq 0 ] && return 0
+    local prev="${UI_PARALLEL:-0}"
+    printf '  %b%s%b %b(%d parallel tasks, cap %s)%b\n' \
+        "${CYAN:-}" "${name}" "${NC:-}" "${DIM:-}" "$count" "${MAX_PARALLEL:-4}" "${NC:-}"
+    UI_PARALLEL=1
+    run_parallel "${MAX_PARALLEL:-4}" "$@"
+    UI_PARALLEL="$prev"
+    UI_STEP=$(( ${UI_STEP:-0} + count ))
+    return 0
+}

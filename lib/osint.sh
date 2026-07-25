@@ -9,12 +9,22 @@
 run_osint_scans() {
     local target="$1"
     local domain="$2"
-    
-    echo -e "\n${BRIGHT_RED}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_RED}║${NC}              ${ORANGE}OSINT & RECONNAISSANCE${NC}                ${BRIGHT_RED}║${NC}"
-    echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
-    echo
-    
+
+    # Step total (keep in sync with the execute_scan calls below). Enrichers are
+    # only counted when their API key is configured, so the counter is exact.
+    local _is_ip=0
+    printf '%s' "$target" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' && _is_ip=1
+    local _t=0
+    [ -n "$domain" ] && _t=$((_t + 6))                       # whois, dns, consolidation, crt, dorks, wayback
+    [ -n "$target" ] && _t=$((_t + 2))                       # reverse-dns, geolocation
+    [ "$_is_ip" = 1 ] && _t=$((_t + 1))                      # shodan internetdb (passive)
+    [ "$_is_ip" = 1 ] && [ -n "$(get_key SHODAN_API_KEY)" ] && _t=$((_t + 1))
+    [ "$_is_ip" = 1 ] && [ -n "$(get_key CENSYS_API_ID)" ] && [ -n "$(get_key CENSYS_API_SECRET)" ] && _t=$((_t + 1))
+    [ -n "$domain" ] && [ -n "$(get_key HUNTER_API_KEY)" ] && _t=$((_t + 1))
+    [ -n "$domain" ] && [ -n "$(get_key VIRUSTOTAL_API_KEY)" ] && _t=$((_t + 1))
+    [ -n "$domain" ] && [ -n "$(get_key SECURITYTRAILS_API_KEY)" ] && _t=$((_t + 1))
+    ui_phase_begin "OSINT & RECONNAISSANCE" "$_t"
+
     if [ -n "$domain" ]; then
         execute_scan "WHOIS Lookup" \
             "whois '$domain' 2>/dev/null || echo 'WHOIS query failed'" \
@@ -177,16 +187,92 @@ cat $OUTDIR/osint/google_dorks.txt" \
     fi
     
     if [ -n "$target" ]; then
-        # Reverse DNS lookup on IP
-        execute_scan "Reverse DNS Lookup" \
-            "dig +short -x '$target' 2>/dev/null || echo 'No PTR record found'" \
-            $TIMEOUT_SHORT "$OUTDIR/osint/reverse_dns.txt"
-        
-        # IP geolocation via ip-api
-        execute_scan "IP Geolocation" \
-            "curl -m 10 -s 'http://ip-api.com/json/$target' 2>/dev/null || echo 'Geolocation lookup failed'" \
-            $TIMEOUT_VERY_SHORT "$OUTDIR/osint/geolocation.txt"
+        # Reverse DNS and geolocation are independent passive lookups — run them
+        # concurrently (collision-safe compact output via lib/ui.sh).
+        run_scan_group "IP intelligence" \
+            "_osint_reverse_dns '$target'" \
+            "_osint_geolocation '$target'"
     fi
-    
+
+    # Optional key-gated enrichment (Shodan / Censys / hunter.io / VirusTotal /
+    # SecurityTrails). Missing keys skip cleanly.
+    run_osint_enrichers "$target" "$domain"
+
     echo -e "${GREEN}[COMPLETE]${NC} OSINT phase completed"
+}
+
+# --- Independent passive lookups (used by run_scan_group) --------------------
+_osint_reverse_dns() {
+    execute_scan "Reverse DNS Lookup" \
+        "dig +short -x '$1' 2>/dev/null || echo 'No PTR record found'" \
+        "$TIMEOUT_SHORT" "$OUTDIR/osint/reverse_dns.txt"
+}
+
+_osint_geolocation() {
+    execute_scan "IP Geolocation" \
+        "curl -m 10 -s 'http://ip-api.com/json/$1' 2>/dev/null || echo 'Geolocation lookup failed'" \
+        "$TIMEOUT_VERY_SHORT" "$OUTDIR/osint/geolocation.txt"
+}
+
+# --- Key-gated OSINT enrichers ----------------------------------------------
+# Each is enabled only if its API key is present; results are appended into the
+# existing osint/*.txt files so the report parsers ingest them unchanged.
+run_osint_enrichers() {
+    local target="$1" domain="$2" key cid csec
+    local is_ip=0
+    printf '%s' "$target" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' && is_ip=1
+
+    # Shodan InternetDB — keyless, passive (CVEs/ports/tags for an IP).
+    if [ "$is_ip" = 1 ]; then
+        execute_scan "Shodan InternetDB (passive)" \
+            "curl -m 15 -s 'https://internetdb.shodan.io/$target' 2>/dev/null || echo 'InternetDB lookup failed'" \
+            "$TIMEOUT_SHORT" "$OUTDIR/osint/shodan_internetdb.txt"
+    fi
+
+    # Shodan host (API key).
+    key="$(get_key SHODAN_API_KEY)"
+    if [ "$is_ip" = 1 ] && [ -n "$key" ]; then
+        execute_scan "Shodan Host (API)" \
+            "curl -m 20 -s 'https://api.shodan.io/shodan/host/$target?key=$key' 2>/dev/null || echo 'Shodan API lookup failed'" \
+            "$TIMEOUT_SHORT" "$OUTDIR/osint/shodan_host.txt"
+    elif [ "$is_ip" = 1 ]; then
+        echo -e "${YELLOW}[SKIP]${NC} Shodan API (no key) — run: security config set SHODAN_API_KEY <key>"
+    fi
+
+    # Censys host (API id + secret).
+    cid="$(get_key CENSYS_API_ID)"; csec="$(get_key CENSYS_API_SECRET)"
+    if [ "$is_ip" = 1 ] && [ -n "$cid" ] && [ -n "$csec" ]; then
+        execute_scan "Censys Host (API)" \
+            "curl -m 20 -s -u '$cid:$csec' 'https://search.censys.io/api/v2/hosts/$target' 2>/dev/null || echo 'Censys lookup failed'" \
+            "$TIMEOUT_SHORT" "$OUTDIR/osint/censys_host.txt"
+    fi
+
+    # hunter.io — emails for a domain (appended to emails.txt for the parser).
+    key="$(get_key HUNTER_API_KEY)"
+    if [ -n "$domain" ] && [ -n "$key" ]; then
+        execute_scan "hunter.io Emails (API)" \
+            "curl -m 20 -s 'https://api.hunter.io/v2/domain-search?domain=$domain&api_key=$key' 2>/dev/null | \
+             grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}' | sort -u | tee -a '$OUTDIR/osint/emails.txt' || echo 'hunter.io lookup failed'" \
+            "$TIMEOUT_SHORT" "$OUTDIR/osint/hunter_emails.txt"
+    elif [ -n "$domain" ]; then
+        echo -e "${YELLOW}[SKIP]${NC} hunter.io emails (no key) — run: security config set HUNTER_API_KEY <key>"
+    fi
+
+    # VirusTotal — passive subdomains (appended to all_subdomains.txt).
+    key="$(get_key VIRUSTOTAL_API_KEY)"
+    if [ -n "$domain" ] && [ -n "$key" ]; then
+        execute_scan "VirusTotal Subdomains (API)" \
+            "curl -m 20 -s -H 'x-apikey: $key' 'https://www.virustotal.com/api/v3/domains/$domain/subdomains?limit=200' 2>/dev/null | \
+             grep -oE '\"id\"[[:space:]]*:[[:space:]]*\"[^\"]+\"' | sed -E 's/.*\"([^\"]+)\"\$/\\1/' | sort -u | tee -a '$OUTDIR/osint/all_subdomains.txt' || echo 'VirusTotal lookup failed'" \
+            "$TIMEOUT_SHORT" "$OUTDIR/osint/virustotal_subdomains.txt"
+    fi
+
+    # SecurityTrails — subdomains (appended to all_subdomains.txt).
+    key="$(get_key SECURITYTRAILS_API_KEY)"
+    if [ -n "$domain" ] && [ -n "$key" ]; then
+        execute_scan "SecurityTrails Subdomains (API)" \
+            "curl -m 20 -s -H 'APIKEY: $key' 'https://api.securitytrails.com/v1/domain/$domain/subdomains?children_only=false' 2>/dev/null | \
+             grep -oE '\"[a-zA-Z0-9_-]+\"' | tr -d '\"' | sed 's/\$/.$domain/' | sort -u | tee -a '$OUTDIR/osint/all_subdomains.txt' || echo 'SecurityTrails lookup failed'" \
+            "$TIMEOUT_SHORT" "$OUTDIR/osint/securitytrails_subdomains.txt"
+    fi
 }

@@ -39,4 +39,18 @@ peak=$(cat "$WORK/peak")
 assert_eq yes "$([ "$peak" -ge 1 ] && [ "$peak" -le 2 ] && echo yes || echo no)" "peak-bounded (peak=$peak)"
 
 rm -rf "$WORK"
+
+# --- run_scan_group ---------------------------------------------------------
+# Runs every task, sets/restores UI_PARALLEL, and advances the step counter by
+# the group size so subsequent sequential steps stay consistent.
+UI_STEP=5; UI_PARALLEL=0; MAX_PARALLEL=4
+G="$(mktemp -d)"
+grp_task() { : > "$G/task.$1"; }
+run_scan_group "grp" "grp_task a" "grp_task b" "grp_task c" >/dev/null 2>&1
+gcount=$(find "$G" -name 'task.*' | wc -l | tr -d ' ')
+assert_eq 3 "$gcount" "run_scan_group ran all tasks"
+assert_eq 8 "$UI_STEP" "run_scan_group advanced UI_STEP by group size"
+assert_eq 0 "$UI_PARALLEL" "run_scan_group restored UI_PARALLEL"
+rm -rf "$G"
+
 finish
