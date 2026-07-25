@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2.4.0] - 2026-07-25 — completion pass
+
+Finishes the v2.4 plan. Focus: the live running UI, a more dynamic/correct HTML report,
+API-key handling, and English documentation.
+
+### Running UI (new `lib/ui.sh`)
+- **Fixed the broken spinner**: it now animates smoothly (10 fps) and is tied to the real
+  command completion (removed the `kill -0 $$` no-op and the 1 fps stutter).
+- **TTY / `NO_COLOR` aware**: no carriage-returns or control characters on pipes/CI; honors
+  `NO_COLOR`, `--no-color`, and `FORCE_COLOR`; ASCII spinner fallback on non-UTF-8 locales.
+- **Aligned phase headers** (replacing the mis-padded box headers) with per-step counters
+  (`[04/12]`) and aligned `✔/✗/⧖` result rows.
+- **Cursor is restored** on interrupt/exit.
+
+### CLI, config & API keys
+- **`security config` subcommand** (`list|set|get|path`) backed by `lib/config.sh`; keys are
+  stored in `~/.config/security-scanner/config.env` (0600 in a 0700 dir), masked in `list`.
+- **Install-time key prompts** (skippable per key and overall) in `install.sh`.
+- **Key-gated OSINT enrichers**: Shodan (+ keyless InternetDB), Censys, hunter.io,
+  VirusTotal, SecurityTrails — skipped cleanly when no key is set.
+- **New flags**: `-o/--output`, `-p/--phases`, `--resume`, `--no-color`.
+- **`--resume DIR`** reuses a previous output dir and skips completed steps.
+
+### Parallelism
+- `run_scan_group` runs independent steps concurrently (bounded by `--max-parallel`) with a
+  collision-safe compact display; wired into the OSINT IP-intel and web-fingerprint phases.
+
+### HTML report (more dynamic + exact)
+- Live "showing X of Y" count, clickable status readout (severity stats filter; PORTS/SUBS/
+  ATT&CK jump), Clear-filters control, sort-direction arrows, spine dimming for the active
+  filter, `/` to focus search + Esc to clear, and a risk gauge that animates 0→score
+  (reduced-motion safe). Verified in-browser (light + dark).
+- Also emits `reports/findings.json` (the machine-readable contract).
+
+### Correctness / cleanup
+- Removed stale references to `auto_attack.sh` and "run automated attacks / persistence
+  (7 methods)" in help and reports; corrected SSH/FTP MITRE technique IDs.
+- Fixed `uninstall.sh` scan-results cleanup (matched `security_scan_*` but the scanner writes
+  `redteam_*/`); bumped its version string; warns that removing config deletes API keys.
+- Documentation rewritten in **English** (`README.md`); `README_EN.md` is now a pointer.
+- CI runs the full `tests/run.sh` and shellchecks `uninstall.sh`.
+
+### Tests
+- New `tests/test_ui.sh`, `tests/test_config.sh`, extended parallel/wiring/report tests
+  (161 bash assertions + 88 Python tests).
+
 ## [2.4.0] - 2026-03-22
 
 ### MAJOR FEATURES
@@ -10,7 +56,7 @@
   - `lib/osint.sh` (192 lines): WHOIS, DNS, subdomains, crt.sh
   - `lib/network.sh` (217 lines): Port scanning, service detection, web discovery
   - `lib/web.sh` (229 lines): Technology fingerprinting, WAF, SSL, directory enumeration, vulnerability scanning
-  - `lib/exploit.sh` (415 lines): Searchsploit, Metasploit prep, credentials, post-exploitation
+  - `lib/exploit.sh`: vulnerability indicators + MITRE ATT&CK defensive guidance (no exploits)
 - **Flexible module loading**: Searches `$SCRIPT_DIR/lib/`, `/usr/local/lib/`, `~/.local/lib/` with graceful fallback
 
 #### Security Hardening
@@ -21,13 +67,13 @@
 - **Error visibility**: Replaced blanket `2>/dev/null` with `error.log` redirection for diagnostics
 
 #### HTML Report Overhaul
-- **Light/dark mode**: Toggle with `prefers-color-scheme` support and localStorage persistence
-- **Scroll progress bar**: Visual indicator at top of page
-- **Accessibility**: Skip-nav link, ARIA roles (`tablist`, `tab`, `tabpanel`), `aria-selected`, `aria-controls`, `:focus-visible` outlines, `aria-hidden` on decorative icons
-- **Global search**: Filter all findings with `/` keyboard shortcut
-- **Severity filters**: Buttons (All/Critical/High/Medium) per section
-- **Copy-to-clipboard**: Per-finding button with toast notification
-- **SVG donut chart**: Vulnerability severity distribution visualization
+- **Offline, self-contained**: system font stack, no CDN — renders air-gapped
+- **Severity-spine layout**: a left vertical severity bar that doubles as a filter-nav
+- **Light/dark mode**: `prefers-color-scheme` + localStorage persistence
+- **Calibrated risk model**: real severity/CVE/CVSS taxonomy (replaces substring counting)
+- **Client-side search / severity-filter / sort** and collapsible per-finding evidence
+- **MITRE ATT&CK coverage matrix** + Navigator layer export (`navigator.json`)
+- **Exports**: structured JSON, Markdown, and ATT&CK layer
 
 #### Structured Logging
 - **Timestamped log**: `init_logging()`, `log_info()`, `log_warn()`, `log_error()` write to `reports/scanner.log`

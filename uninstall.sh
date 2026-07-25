@@ -31,7 +31,7 @@ EOF
     echo -e "${NC}"
     echo "================================================================"
     echo -e "${WHITE}                    UNINSTALLATION SCRIPT${NC}"
-    echo -e "${CYAN}                         Version 2.0.0${NC}"
+    echo -e "${CYAN}                         Version 2.4.0${NC}"
     echo "================================================================"
     echo
 }
@@ -148,9 +148,15 @@ remove_go_tools() {
 
 clean_scan_results() {
     echo -e "${CYAN}[INFO]${NC} Checking for scan results..."
-    
-    local scan_dirs=($(find . -maxdepth 1 -name "security_scan_*" -type d 2>/dev/null))
-    
+
+    # The scanner writes redteam_TIMESTAMP/ dirs (older builds used
+    # security_scan_*/ and results_*/ — match all so cleanup is complete).
+    local scan_dirs=()
+    while IFS= read -r d; do [ -n "$d" ] && scan_dirs+=("$d"); done < <(
+        find . -maxdepth 1 -type d \
+            \( -name "redteam_*" -o -name "security_scan_*" -o -name "results_*" \) 2>/dev/null
+    )
+
     if [ ${#scan_dirs[@]} -gt 0 ]; then
         echo -e "${YELLOW}[FOUND]${NC} Found ${#scan_dirs[@]} scan result directories:"
         for dir in "${scan_dirs[@]}"; do
@@ -194,7 +200,8 @@ remove_config_files() {
         for config in "${found_configs[@]}"; do
             echo "  - $config"
         done
-        
+        echo -e "${RED}[NOTE]${NC} This includes ${WHITE}config.env${NC} — removing it deletes any saved API keys."
+
         read -rp "Remove configuration files? [y/N]: " remove_configs
         
         if [[ "$remove_configs" =~ ^[Yy]$ ]]; then

@@ -11,7 +11,18 @@
 CONFIG_KNOWN_KEYS="SHODAN_API_KEY CENSYS_API_ID CENSYS_API_SECRET HUNTER_API_KEY VIRUSTOTAL_API_KEY SECURITYTRAILS_API_KEY"
 
 config_dir() {
-    printf '%s' "${SECURITY_SCANNER_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/security-scanner}"
+    if [ -n "${SECURITY_SCANNER_CONFIG_DIR:-}" ]; then
+        printf '%s' "$SECURITY_SCANNER_CONFIG_DIR"; return
+    fi
+    local base="${XDG_CONFIG_HOME:-$HOME/.config}"
+    # Under sudo, prefer the invoking user's config so keys set as the user are
+    # still found when the scan itself runs as root (sudo nmap -sS/-O/-sU).
+    if [ "$(id -u 2>/dev/null || echo 1000)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+        local home
+        home="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+        [ -n "$home" ] && base="$home/.config"
+    fi
+    printf '%s/security-scanner' "$base"
 }
 
 config_file() {
