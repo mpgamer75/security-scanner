@@ -40,7 +40,9 @@ STEALTH_MODE=false
 AGGRESSIVE_MODE=false
 EVASION_OVERRIDE=""   # --evasion none|low|med|high (empty = derive from mode)
 TARGET_TYPE=""        # ip|ipv6|cidr|hostname|url (set by profile_target)
-MAX_PARALLEL=4        # bounded concurrency for independent scan steps
+# Exported so run_parallel (lib/parallel.sh) and sourced scan modules can read
+# the configured concurrency cap. Overridable with --max-parallel.
+export MAX_PARALLEL=4  # bounded concurrency for independent scan steps
 
 # Timeouts - optimized for reliability and performance
 # Exported: used by sourced lib/ modules (osint.sh, network.sh, web.sh, exploit.sh)
@@ -169,7 +171,7 @@ if ! command -v build_port_scan_args >/dev/null 2>&1; then
     build_port_scan_args() {
         echo "$(nmap_scan_flag "$1") $(nmap_base_flags) $(nmap_timing_flags "$2") $4 $5" | tr -s ' '
     }
-    run_parallel() { local m="$1"; shift; local c; for c in "$@"; do eval "$c"; done; }
+    run_parallel() { shift; local c; for c in "$@"; do eval "$c"; done; }
 fi
 
 # active_mode : normalize the boolean flags into a single mode name.

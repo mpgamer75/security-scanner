@@ -45,7 +45,7 @@ Version majeure introduisant une architecture modulaire, un renforcement securit
 
 ### CI/CD et Tests
 - **GitHub Actions CI**: Pipeline complet avec ShellCheck, pylint, smoke tests, verification XSS, scan securite Bandit
-- **32 tests unitaires**: `tests/test_html_generator.py` couvrant toutes les fonctions de generation HTML
+- **Tests unitaires**: 84 tests Python (`report/tests/`) + tests bash des modules `lib/`, lances via `tests/run.sh`
 - **ShellCheck clean**: Tous les scripts (security, install.sh, lib/*.sh) passent shellcheck sans warnings
 
 ### Docker
@@ -115,7 +115,7 @@ chmod +x install.sh
 - `lib/web.sh` - Module web
 - `lib/exploit.sh` - Module exploitation
 - `.github/workflows/ci.yml` - Pipeline CI/CD
-- `tests/test_html_generator.py` - Tests unitaires
+- `tests/` (bash) + `report/tests/` (Python) - Tests unitaires
 - `Dockerfile` - Image Docker
 - `docker-compose.yml` - Orchestration Docker
 - `config.yml.example` - Template de configuration
@@ -136,7 +136,7 @@ security-scanner/
 ├── html_generator.py          # Generateur de rapports HTML (1,794 lignes)
 ├── install.sh                 # Script d'installation
 ├── tests/
-│   └── test_html_generator.py # 32 tests unitaires
+│   └── run.sh                 # Lance les tests (bash + Python)
 ├── .github/workflows/
 │   └── ci.yml                 # Pipeline CI/CD
 ├── Dockerfile                 # Image Docker

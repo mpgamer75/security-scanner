@@ -35,7 +35,7 @@
 
 #### CI/CD & Testing
 - **GitHub Actions CI**: ShellCheck, pylint, smoke tests, XSS verification, Bandit security scan
-- **Unit tests**: 32 tests in `tests/test_html_generator.py` (all passing)
+- **Unit tests**: 84 Python tests in `report/tests/` + bash `lib/` module tests, run via `tests/run.sh`
 - **ShellCheck clean**: All scripts pass `shellcheck -e SC2086,SC2046`
 
 #### Docker Support

@@ -45,7 +45,7 @@
 ### CI/CD, Docker et Tests
 
 - **GitHub Actions CI** - ShellCheck, pylint, smoke tests, verification XSS, scan Bandit
-- **32 tests unitaires** - `tests/test_html_generator.py` (tous passent)
+- **Tests unitaires** - 84 tests Python (`report/tests/`) + tests bash des modules `lib/`, lances via `tests/run.sh`
 - **ShellCheck clean** - Tous les scripts passent shellcheck
 - **Docker** - Dockerfile Kali Linux + docker-compose.yml avec volume de sortie
 - **Configuration** - Template `config.yml.example` avec timeouts, wordlists, cles API
