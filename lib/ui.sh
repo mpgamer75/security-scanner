@@ -54,7 +54,7 @@ ui_init() {
     UI_COLOR="$want_color"
 
     if [ "$UI_ASCII" -eq 1 ]; then
-        UI_FRAMES=('|' '/' '-' '\')
+        UI_FRAMES=('|' '/' '-' "\\")
         UI_OK='+'; UI_BAD='x'; UI_TIMEOUT='~'; UI_STOP='!'; UI_RUN='>'; UI_DASH='-'
     else
         UI_FRAMES=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')

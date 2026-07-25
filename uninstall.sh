@@ -4,10 +4,8 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
-GRAY='\033[0;90m'
 NC='\033[0m'
 
 display_uninstall_banner() {
@@ -101,8 +99,9 @@ remove_go_tools() {
     
     if [[ "$remove_go" =~ ^[Yy]$ ]]; then
         if command -v go &> /dev/null; then
-            local gopath=$(go env GOPATH)
-            local gobin=$(go env GOBIN)
+            local gopath gobin
+            gopath=$(go env GOPATH)
+            gobin=$(go env GOBIN)
             
             # Chercher dans GOBIN d'abord, puis GOPATH/bin
             local bin_paths=()
@@ -124,7 +123,7 @@ remove_go_tools() {
                 
                 if [ "$found" = false ]; then
                     # Chercher dans PATH
-                    local tool_path=$(which "$tool" 2>/dev/null)
+                    local tool_path; tool_path=$(which "$tool" 2>/dev/null)
                     if [ -n "$tool_path" ] && [[ "$tool_path" == *"/go/"* ]]; then
                         rm -f "$tool_path"
                         removed_tools+=("$tool")
@@ -235,7 +234,7 @@ remove_custom_wordlists() {
         if [ -d "$location" ]; then
             # Vérifier si ce sont nos wordlists créées (petites tailles)
             if [ -f "$location/common.txt" ]; then
-                local size=$(stat -c%s "$location/common.txt" 2>/dev/null || echo "0")
+                local size; size=$(stat -c%s "$location/common.txt" 2>/dev/null || echo "0")
                 if [ "$size" -lt 1000 ]; then  # Moins de 1KB = probablement nos wordlists de base
                     found_wordlists+=("$location")
                 fi
