@@ -44,7 +44,7 @@ API-key handling, and English documentation.
 
 ### Tests
 - New `tests/test_ui.sh`, `tests/test_config.sh`, extended parallel/wiring/report tests
-  (161 bash assertions + 88 Python tests).
+  (139 bash assertions + 88 Python tests).
 
 ## [2.4.0] - 2026-03-22
 
