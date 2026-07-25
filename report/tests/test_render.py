@@ -166,5 +166,35 @@ class TestRenderMarkdown(unittest.TestCase):
         self.assertIn("CVE-2017-0143", md)
 
 
+class TestRenderInteractiveHooks(unittest.TestCase):
+    """The DOM hooks app.js relies on must be present in the rendered HTML."""
+
+    def test_gauge_arc_has_animatable_score(self):
+        html = render.render_html(_sample())
+        # arc starts at 0 and carries the target score for app.js to animate to.
+        self.assertIn('id="gauge-arc"', html)
+        self.assertIn('data-score="65"', html)
+        self.assertIn('stroke-dasharray="0 100"', html)
+
+    def test_statusline_stats_are_interactive(self):
+        html = render.render_html(_sample())
+        # severity stats toggle the filter; others jump to a section
+        self.assertIn('class="stat" data-sev="critical"', html)
+        self.assertIn('data-jump="surface"', html)
+        self.assertIn('data-jump="osint"', html)
+        self.assertIn('data-jump="attack"', html)
+
+    def test_live_count_and_clear_hooks(self):
+        html = render.render_html(_sample())
+        self.assertIn('id="findings-count"', html)
+        self.assertIn('data-total="2"', html)      # two findings in the sample
+        self.assertIn('id="clear-filters"', html)
+
+    def test_sortable_headers_present(self):
+        html = render.render_html(_sample())
+        self.assertIn('class="sortable" data-sort="severity"', html)
+        self.assertIn('data-sort="host"', html)
+
+
 if __name__ == "__main__":
     unittest.main()

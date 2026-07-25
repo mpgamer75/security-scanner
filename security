@@ -40,6 +40,10 @@ STEALTH_MODE=false
 AGGRESSIVE_MODE=false
 EVASION_OVERRIDE=""   # --evasion none|low|med|high (empty = derive from mode)
 TARGET_TYPE=""        # ip|ipv6|cidr|hostname|url (set by profile_target)
+OUTPUT_OVERRIDE=""    # -o/--output DIR (empty = auto redteam_TIMESTAMP)
+PHASES=""             # -p/--phases csv (osint,network,web,exploit); empty = by menu/auto
+RESUME_DIR=""         # --resume DIR (reuse an existing output dir; skip done steps)
+UI_NO_COLOR=0         # --no-color (also honors the NO_COLOR env var)
 # Exported so run_parallel (lib/parallel.sh) and sourced scan modules can read
 # the configured concurrency cap. Overridable with --max-parallel.
 export MAX_PARALLEL=4  # bounded concurrency for independent scan steps
@@ -146,12 +150,36 @@ json_escape() {
 # installés à côté du script. Fallbacks minimalistes si lib/ est absent.
 _SCRIPT_SRC="${BASH_SOURCE[0]:-$0}"
 _SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$_SCRIPT_SRC" 2>/dev/null || echo "$_SCRIPT_SRC")")" 2>/dev/null && pwd)"
-for _lib in targeting evasion scan parallel; do
+for _lib in ui config targeting evasion scan parallel; do
     if [ -f "$_SCRIPT_DIR/lib/$_lib.sh" ]; then
         # shellcheck disable=SC1090
         source "$_SCRIPT_DIR/lib/$_lib.sh"
     fi
 done
+# UI fallbacks: if lib/ui.sh is absent, provide a minimal (unanimated) runner so
+# the scanner still works. Never crash over a missing UI module.
+if ! command -v execute_scan >/dev/null 2>&1; then
+    ui_init() { UI_TTY=0; [ -t 1 ] && UI_TTY=1; UI_STEP=0; UI_PHASE_TOTAL=0; UI_PARALLEL=0; UI_RESUME="${UI_RESUME:-0}"; }
+    ui_cleanup() { :; }
+    ui_rule() { [ -n "${1:-}" ] && echo "== $1 =="; }
+    ui_phase_begin() { UI_STEP=0; UI_PHASE_TOTAL="${2:-0}"; echo; ui_rule "${1:-}"; }
+    run_scan_group() { local n="$1"; shift; run_parallel "${MAX_PARALLEL:-4}" "$@"; }
+    execute_scan() {
+        local name="$1" command="$2" timeout="$3" output="$4" critical="${5:-false}" rc=0
+        mkdir -p "$(dirname "$output")" 2>/dev/null || true
+        echo -e "${ORANGE}[SCAN]${NC} $name ${DIM}(timeout: ${timeout}s)${NC}"
+        timeout "$timeout" bash -c "$command" > "$output" 2>&1 || rc=$?
+        if [ -s "$output" ]; then echo -e "${GREEN}[DONE]${NC} $name"; return 0; fi
+        echo -e "${RED}[FAIL]${NC} $name (no data)"
+        [ "$critical" = true ] && return 1 || return 0
+    }
+fi
+# Config fallbacks if lib/config.sh is absent.
+if ! command -v get_key >/dev/null 2>&1; then
+    load_config() { :; }
+    get_key() { printf ''; }
+    config_cmd() { echo "config module unavailable (lib/config.sh missing)"; return 1; }
+fi
 # Fallbacks (degraded, but never crash) if the lib modules are missing.
 if ! command -v build_port_scan_args >/dev/null 2>&1; then
     echo -e "${YELLOW}[WARN]${NC} lib/ modules not found next to script; using degraded defaults" >&2
@@ -188,7 +216,7 @@ active_evasion() {
 }
 
 display_banner() {
-    clear
+    [ "${UI_TTY:-1}" = 1 ] && clear
     echo -e "${BRIGHT_RED}"
     cat << "EOF"
     ███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗
@@ -229,6 +257,7 @@ show_help() {
 
 USAGE:
     security [OPTIONS]
+    security config {list | set NAME [VALUE] | get NAME | path}
 
 OPTIONS:
     -h, --help          Show this help message
@@ -240,9 +269,18 @@ OPTIONS:
     -t, --target VAL    Target: IP / CIDR / hostname / URL (skips the prompt)
     -u, --url VAL       Target URL for web testing
     -d, --domain VAL    Target domain for OSINT
+    -o, --output DIR    Write results to DIR (default: redteam_TIMESTAMP)
+    -p, --phases LIST   Run only these phases (csv): osint,network,web,exploit
     --evasion LEVEL     Override evasion: none | low | med | high
     --max-parallel N    Max concurrent independent scan steps (default 4)
+    --resume DIR        Reuse a previous output DIR; skip already-completed steps
+    --no-color          Disable colored output (also honors the NO_COLOR env var)
     -y, --yes           Non-interactive: run the full assessment without prompts
+
+API KEYS (optional OSINT enrichment — Shodan, Censys, hunter.io, VirusTotal,
+    SecurityTrails). Configure them any time; missing keys are skipped cleanly:
+        security config set SHODAN_API_KEY <key>
+        security config list
 
 TARGET TYPES (auto-detected and adapted):
     IP (10.0.0.5), CIDR (10.0.0.0/24), hostname (example.com), URL, IPv6.
@@ -276,35 +314,34 @@ SCAN TYPES:
 
     4. Complete Red Team Assessment
        - Full OSINT + Network + Web workflow
-       - Exploit database correlation (searchsploit)
-       - Metasploit module preparation
-       - Attack surface analysis
-       - Automated attack scripts generation
-       - Default credentials database
-       - Post-exploitation preparation
-       - Persistence techniques (7 methods)
+       - Attack surface analysis + exploit correlation (searchsploit)
+       - Vulnerability indicators mapped to MITRE ATT&CK techniques
+       - Defensive guidance per finding (detection + remediation)
+       - Exploitation GUIDANCE only (technique IDs, tools, references) —
+         no working exploits, brute-force, webshells, or persistence are run
 
 FEATURES:
-    - 60% faster than v2.2.1
-    - Anti-blocking with -Pn forced
-    - Guaranteed report generation (98% success)
-    - Real-time progress indicators
-    - Graceful interrupt handling (Ctrl+C)
-    - Adaptive timeout management
-    - SMB enumeration fixed and robust
-    - JSON + TXT reports
+    - Adaptive targeting (IP / CIDR / hostname / URL / IPv6)
+    - Real IDS/IPS evasion in stealth mode; WAF-aware web scanning
+    - Bounded parallelism for independent scan steps
+    - Offline, self-contained HTML report (+ JSON / Markdown / ATT&CK layer)
+    - TTY-aware progress UI (NO_COLOR aware); graceful Ctrl+C handling
+    - Resume interrupted runs (--resume); structured scanner.log
 
 EXAMPLES:
-    security              # Interactive full assessment
-    security -q          # Quick reconnaissance
-    security -a          # Aggressive full scan
-    security -s          # Stealth mode
+    security                         # Interactive full assessment
+    security -q -t scanme.nmap.org   # Quick recon of a host
+    security -a -t 10.0.0.0/24       # Aggressive full scan of a subnet
+    security -s -t example.com       # Stealth mode
+    security -p osint,web -d acme.io -u https://acme.io   # Only OSINT + web
+    security config set SHODAN_API_KEY <key>             # Enable Shodan enrichment
 
 EOF
 }
 
 handle_interrupt() {
     SCAN_INTERRUPTED=true
+    command -v ui_cleanup >/dev/null 2>&1 && ui_cleanup
     echo -e "\n${ORANGE}[!]${NC} Scan interrupted by user..."
     
     if [ -n "$CURRENT_SCAN" ]; then
@@ -320,11 +357,23 @@ handle_interrupt() {
 }
 
 prepare_output() {
-    OUTDIR="redteam_$(date +'%Y%m%d_%H%M%S')"
+    if [ -n "$RESUME_DIR" ]; then
+        # Resume: reuse an existing run directory and skip completed steps.
+        if [ ! -d "$RESUME_DIR" ]; then
+            echo -e "${RED}[ERROR]${NC} --resume dir not found: $RESUME_DIR"; exit 1
+        fi
+        OUTDIR="$RESUME_DIR"
+        UI_RESUME=1
+        echo -e "${YELLOW}[RESUME]${NC} Reusing ${WHITE}$OUTDIR${NC} — steps with existing output are skipped"
+    elif [ -n "$OUTPUT_OVERRIDE" ]; then
+        OUTDIR="$OUTPUT_OVERRIDE"
+    else
+        OUTDIR="redteam_$(date +'%Y%m%d_%H%M%S')"
+    fi
     mkdir -p "$OUTDIR"/{osint,network,web,exploit,reports}
 
     # When running as root (sudo), make output accessible to the calling user
-    if [ "$(id -u)" -eq 0 ] && [ -n "$SUDO_USER" ]; then
+    if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
         chown -R "$SUDO_USER:$SUDO_USER" "$OUTDIR"
     fi
 
@@ -332,78 +381,9 @@ prepare_output() {
     init_logging
 }
 
-# Core scan execution with progress indicator and timeout management
-execute_scan() {
-    local name="$1"
-    local command="$2"
-    local timeout="$3"
-    local output="$4"
-    local critical="${5:-false}"
-    
-    CURRENT_SCAN="$name"
-    log_info "Starting scan: $name (timeout: ${timeout}s)"
-    echo -e "${ORANGE}[SCAN]${NC} $name ${DIM}(timeout: ${timeout}s)${NC}"
-
-    # Progress spinner
-    (
-        local elapsed=0
-        local spinner=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-        while [ $elapsed -lt $timeout ] && kill -0 $$ 2>/dev/null; do
-            local idx=$((elapsed % 10))
-            printf "\r${YELLOW}${spinner[$idx]}${NC} ${name} ${DIM}[%02d:%02d]${NC}  " \
-                   $((elapsed/60)) $((elapsed%60))
-            sleep 1
-            ((elapsed++))
-        done
-        printf "\r%-80s\r" " "
-    ) &
-    local progress_pid=$!
-    
-    set +e
-    timeout "$timeout" bash -c "$command" > "$output" 2>&1 &
-    local cmd_pid=$!
-    
-    while kill -0 $cmd_pid 2>/dev/null && [ "$SCAN_INTERRUPTED" = false ]; do
-        sleep 0.5
-    done
-    
-    kill $progress_pid 2>/dev/null || true
-    wait $progress_pid 2>/dev/null || true
-    
-    local exit_code=0
-    if kill -0 $cmd_pid 2>/dev/null; then
-        kill -9 $cmd_pid 2>/dev/null || true
-        wait $cmd_pid 2>/dev/null || true
-        
-        if [ "$SCAN_INTERRUPTED" = true ]; then
-            echo "SCAN INTERRUPTED" >> "$output"
-            printf "\r${ORANGE}[STOP]${NC} %-60s\n" "$name"
-            exit_code=130
-        else
-            echo "TIMEOUT AFTER ${timeout}s" >> "$output"
-            printf "\r${YELLOW}[TIME]${NC} %-60s\n" "$name"
-            exit_code=124
-        fi
-    else
-        wait $cmd_pid
-        exit_code=$?
-    fi
-    
-    set -e
-    CURRENT_SCAN=""
-    
-    if [ -s "$output" ]; then
-        local lines
-        lines=$(wc -l < "$output" 2>/dev/null || echo "0")
-        printf "\r${GREEN}[DONE]${NC} %-50s ${DIM}($lines lines)${NC}\n" "$name"
-        log_info "Completed: $name ($lines lines)"
-        return 0
-    else
-        printf "\r${RED}[FAIL]${NC} %-50s ${DIM}(no data)${NC}\n" "$name"
-        log_warn "No data from: $name"
-        [ "$critical" = true ] && return 1 || return 0
-    fi
-}
+# NOTE: execute_scan() now lives in lib/ui.sh (TTY-aware, smooth spinner tied to
+# real completion, NO_COLOR support). A minimal fallback is defined above if the
+# module is missing.
 
 show_scan_menu() {
     echo -e "\n${BRIGHT_RED}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -654,11 +634,12 @@ REPORT_HEADER_END
         echo "  4. Deploy network segmentation"
         echo "  5. Enable comprehensive logging"
         echo ""
-        echo "Red Team Next Steps:"
-        echo "  1. Review exploit scripts in exploit/"
-        echo "  2. Test default credentials"
-        echo "  3. Run automated attacks"
-        echo "  4. Execute Metasploit modules"
+        echo "Red Team Next Steps (authorized ROE only):"
+        echo "  1. Review the MITRE guidance + defensive indicators in exploit/"
+        echo "  2. Validate high/critical findings manually before acting"
+        echo "  3. Correlate CVEs with searchsploit / vendor advisories"
+        echo "  4. Load navigator.json in the ATT&CK Navigator for coverage"
+        echo "  5. Re-test after remediation to confirm closure"
         echo ""
 
         echo "--- OUTPUT FILES ---"
@@ -839,9 +820,38 @@ generate_html_report() {
         return 1
     fi
 }
+# run_selected_phases <csv> — run an explicit, comma-separated phase list
+# (osint,network,web,exploit) instead of the interactive menu.
+run_selected_phases() {
+    local csv="$1" p norm
+    IFS=',' read -ra _phase_list <<< "$csv"
+    for p in "${_phase_list[@]}"; do
+        [ "$SCAN_INTERRUPTED" = true ] && break
+        norm="$(echo "$p" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+        case "$norm" in
+            osint)              run_osint_scans "$TARGET" "$DOMAIN" ;;
+            network|net)        run_network_scans "$TARGET" ;;
+            web)
+                if [ -z "$URL" ]; then URL="$(detect_web_services "$TARGET")"; fi
+                [ -n "$URL" ] && run_web_scans "$URL" ;;
+            exploit|guidance)   run_exploitation_prep "$TARGET" ;;
+            "")                 ;;
+            *) echo -e "${YELLOW}[WARN]${NC} Unknown phase '$p' (use osint,network,web,exploit)" ;;
+        esac
+    done
+}
+
 main() {
     local AUTO_MODE=false
-    
+
+    # `security config ...` — manage API keys and exit before anything else.
+    if [ "${1:-}" = "config" ]; then
+        shift
+        ui_init $([ "$UI_NO_COLOR" = 1 ] && echo --no-color)
+        config_cmd "$@"
+        exit $?
+    fi
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help) show_help; exit 0 ;;
@@ -852,21 +862,30 @@ main() {
             -t|--target) TARGET="${2:-}"; shift 2 ;;
             -u|--url) URL="${2:-}"; shift 2 ;;
             -d|--domain) DOMAIN="${2:-}"; shift 2 ;;
+            -o|--output) OUTPUT_OVERRIDE="${2:-}"; shift 2 ;;
+            -p|--phases) PHASES="${2:-}"; shift 2 ;;
             --evasion) EVASION_OVERRIDE="${2:-}"; shift 2 ;;
             --max-parallel) MAX_PARALLEL="${2:-4}"; shift 2 ;;
+            --resume) RESUME_DIR="${2:-}"; shift 2 ;;
+            --no-color) UI_NO_COLOR=1; shift ;;
             -y|--yes) AUTO_MODE=true; shift ;;
             *) echo "Unknown option: $1"; exit 1 ;;
         esac
     done
+
+    # Initialize the terminal UI (TTY/NO_COLOR aware) and load API keys.
+    ui_init $([ "$UI_NO_COLOR" = 1 ] && echo --no-color)
+    trap 'ui_cleanup' EXIT
+    load_config
 
     # Validate --evasion
     case "${EVASION_OVERRIDE:-}" in
         ""|none|low|med|high) ;;
         *) echo "Invalid --evasion '$EVASION_OVERRIDE' (use none|low|med|high)"; exit 1 ;;
     esac
-    
+
     trap 'handle_interrupt' SIGINT SIGTERM
-    
+
     display_banner
     
     if [ -z "$TARGET" ]; then
@@ -908,8 +927,12 @@ main() {
     [ -n "$URL" ] && [ -z "$DOMAIN" ] && DOMAIN=$(echo "$URL" | sed -E 's|https?://([^/]+).*|\1|' | sed 's|:.*||')
     echo -e "${CYAN}[TARGET]${NC} ${WHITE}$TARGET${NC} ${GRAY}(type: ${TARGET_TYPE})${NC}"
 
-    # Si un mode automatique est activé (-q, -s, -a), on lance directement le scan complet
-    if [ "$AUTO_MODE" = true ]; then
+    # Explicit --phases wins; otherwise an automatic mode (-q/-s/-a/-y) runs the
+    # full assessment; otherwise show the interactive menu.
+    if [ -n "$PHASES" ]; then
+        CHOICE="phases"
+        echo -e "${GREEN}[PHASES]${NC} Running selected phases: ${WHITE}$PHASES${NC}"
+    elif [ "$AUTO_MODE" = true ]; then
         CHOICE=4
         echo -e "${GREEN}[AUTO]${NC} Automatic mode: Full Red Team assessment selected"
     else
@@ -918,14 +941,14 @@ main() {
     fi
     
     prepare_output
-    
-    echo -e "\n${BRIGHT_RED}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_RED}║${NC}              ${ORANGE}ASSESSMENT STARTED${NC}                   ${BRIGHT_RED}║${NC}"
-    echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
+
+    echo
+    ui_rule "ASSESSMENT STARTED"
     echo -e "${DIM}Ctrl+C to stop gracefully${NC}"
     echo
     
     case "$CHOICE" in
+        phases) run_selected_phases "$PHASES" ;;
         1) run_osint_scans "$TARGET" "$DOMAIN" ;;
         2) run_network_scans "$TARGET" ;;
         3)
@@ -958,16 +981,17 @@ main() {
     [ "$SCAN_INTERRUPTED" = true ] && exit 130
     
     generate_report
-    
-    echo -e "\n${BRIGHT_RED}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_RED}║${NC}              ${GREEN}COMPLETED${NC}                            ${BRIGHT_RED}║${NC}"
-    echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
+
     echo
-    echo -e "${ORANGE}Results:${NC}  ${WHITE}$OUTDIR/${NC}"
-    echo -e "${ORANGE}Report:${NC}   ${WHITE}$OUTDIR/reports/summary_report.txt${NC}"
-    [ -f "$OUTDIR/reports/assessment.html" ] && echo -e "${ORANGE}HTML:${NC}     ${WHITE}$OUTDIR/reports/assessment.html${NC}"
-    [ -f "$OUTDIR/reports/assessment.json" ] && echo -e "${ORANGE}JSON:${NC}     ${WHITE}$OUTDIR/reports/assessment.json${NC}"
-    echo -e "${ORANGE}Scripts:${NC}  ${WHITE}$OUTDIR/exploit/auto_attack.sh${NC}"
+    ui_rule "ASSESSMENT COMPLETE"
+    echo
+    echo -e "${ORANGE}Results:${NC}   ${WHITE}$OUTDIR/${NC}"
+    echo -e "${ORANGE}Report:${NC}    ${WHITE}$OUTDIR/reports/summary_report.txt${NC}"
+    [ -f "$OUTDIR/reports/assessment.html" ] && echo -e "${ORANGE}HTML:${NC}      ${WHITE}$OUTDIR/reports/assessment.html${NC}"
+    [ -f "$OUTDIR/reports/assessment.json" ] && echo -e "${ORANGE}JSON:${NC}      ${WHITE}$OUTDIR/reports/assessment.json${NC}"
+    [ -f "$OUTDIR/reports/findings.json" ] && echo -e "${ORANGE}Findings:${NC}  ${WHITE}$OUTDIR/reports/findings.json${NC}"
+    [ -f "$OUTDIR/reports/navigator.json" ] && echo -e "${ORANGE}ATT&CK:${NC}    ${WHITE}$OUTDIR/reports/navigator.json${NC} ${DIM}(load in ATT&CK Navigator)${NC}"
+    [ -d "$OUTDIR/exploit" ] && echo -e "${ORANGE}Guidance:${NC}  ${WHITE}$OUTDIR/exploit/${NC} ${DIM}(defensive indicators + MITRE mapping)${NC}"
     echo
     echo -e "${YELLOW}Use responsibly - Authorized testing only${NC}"
     echo

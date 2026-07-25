@@ -533,7 +533,7 @@ install_lib_modules() {
     local base="https://raw.githubusercontent.com/mpgamer75/security-scanner/main/lib"
     mkdir -p lib
     local ok=true
-    for f in targeting evasion scan parallel osint network web exploit mitre; do
+    for f in ui config targeting evasion scan parallel osint network web exploit mitre; do
         if ! curl -sSL "$base/$f.sh" -o "lib/$f.sh"; then ok=false; fi
     done
     if [ "$ok" = true ]; then
@@ -573,6 +573,61 @@ install_report_package() {
     fi
 }
 
+# Optional API-key setup — writes ~/.config/security-scanner/config.env (0600).
+# Every key is individually skippable (blank input), and the whole step is
+# skippable. Keys can be added later with: security config set NAME VALUE
+configure_api_keys() {
+    echo
+    echo -e "${CYAN}[INFO]${NC} Optional API keys enable extra passive OSINT enrichment:"
+    echo -e "       ${WHITE}Shodan, Censys, hunter.io, VirusTotal, SecurityTrails${NC}"
+    echo -e "       Leave any blank to skip it. You can also configure them later with:"
+    echo -e "       ${WHITE}security config set NAME VALUE${NC}  (${WHITE}security config list${NC} to review)"
+    echo
+
+    read -rp "Configure API keys now? [y/N]: " ans
+    if [[ ! "$ans" =~ ^[Yy] ]]; then
+        echo -e "${YELLOW}[SKIP]${NC} API keys — add them any time with 'security config set'"
+        return 0
+    fi
+
+    # Resolve the invoking user's config dir (works whether or not sudo is used).
+    local cfg_base="${XDG_CONFIG_HOME:-$HOME/.config}"
+    if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+        local uhome
+        uhome="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+        [ -n "$uhome" ] && cfg_base="$uhome/.config"
+    fi
+    local cfg_dir="$cfg_base/security-scanner"
+    local cfg_file="$cfg_dir/config.env"
+
+    mkdir -p "$cfg_dir" && chmod 700 "$cfg_dir"
+    [ -f "$cfg_file" ] || : > "$cfg_file"
+    chmod 600 "$cfg_file"
+
+    local keys=(SHODAN_API_KEY CENSYS_API_ID CENSYS_API_SECRET HUNTER_API_KEY VIRUSTOTAL_API_KEY SECURITYTRAILS_API_KEY)
+    local name val tmp saved=0
+    for name in "${keys[@]}"; do
+        read -rp "  $name (blank to skip): " val
+        if [ -n "$val" ]; then
+            tmp="$(mktemp)"
+            grep -v -E "^${name}=" "$cfg_file" 2>/dev/null > "$tmp" || true
+            echo "${name}=${val}" >> "$tmp"
+            mv "$tmp" "$cfg_file"
+            chmod 600 "$cfg_file"
+            saved=$((saved + 1))
+            echo -e "  ${GREEN}[OK]${NC} $name saved"
+        else
+            echo -e "  ${YELLOW}[SKIP]${NC} $name"
+        fi
+    done
+
+    # Hand ownership back to the invoking user if we ran under sudo.
+    if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+        chown -R "$SUDO_USER":"$SUDO_USER" "$cfg_dir" 2>/dev/null || true
+    fi
+    echo -e "${GREEN}[OK]${NC} $saved key(s) stored in ${WHITE}$cfg_file${NC} (permissions 600)"
+}
+
 create_desktop_entry() {
     read -rp "Create desktop entry? [y/N]: " desktop_choice
     
@@ -600,6 +655,7 @@ main() {
     install_wordlists
     install_nuclei_templates
     install_scanner
+    configure_api_keys
     create_desktop_entry
     
     echo
@@ -607,10 +663,11 @@ main() {
     echo -e "${GREEN}                     INSTALLATION COMPLETED${NC}"
     echo "================================================================"
     echo -e "${WHITE}Usage:${NC}"
-    echo -e "  ${CYAN}sudo security${NC}      # Start interactive scanner (recommended)"
-    echo -e "  ${CYAN}security${NC}           # Start without sudo (limited features)"
-    echo -e "  ${CYAN}security --help${NC}    # Show help information"
-    echo -e "  ${CYAN}security --version${NC} # Show version"
+    echo -e "  ${CYAN}sudo security${NC}              # Start interactive scanner (recommended)"
+    echo -e "  ${CYAN}security${NC}                   # Start without sudo (limited features)"
+    echo -e "  ${CYAN}security -t scanme.nmap.org${NC} # Non-interactive target"
+    echo -e "  ${CYAN}security config list${NC}       # Review / add optional API keys"
+    echo -e "  ${CYAN}security --help${NC}            # Show help information"
     echo
     echo -e "${YELLOW}Important:${NC} Running with ${WHITE}sudo${NC} is ${GREEN}recommended${NC} for full functionality"
     echo -e "           (UDP scans, OS detection, raw packet manipulation)"

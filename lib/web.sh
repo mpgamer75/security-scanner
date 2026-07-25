@@ -21,62 +21,43 @@ run_web_scans() {
         url="http://$url"
     fi
 
-    echo -e "\n${BRIGHT_RED}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_RED}║${NC}         ${ORANGE}WEB APPLICATION TESTING${NC}               ${BRIGHT_RED}║${NC}"
-    echo -e "${BRIGHT_RED}╚════════════════════════════════════════════════════════════╝${NC}"
-    echo
-    echo -e "${CYAN}[TARGET]${NC} $url"
-    echo
-
     local domain
     domain=$(echo "$url" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|:.*||')
-    
+
+    # Step total (keep in sync with the execute_scan calls below).
+    # Always: port-check, ssl, xss = 3.
+    local _wl="/usr/share/wordlists/dirb"; [ ! -d "$_wl" ] && _wl="$HOME/.local/share/wordlists/dirb"
+    local _t=3
+    command -v whatweb >/dev/null 2>&1 && _t=$((_t + 1))
+    command -v wafw00f >/dev/null 2>&1 && _t=$((_t + 1))
+    command -v gobuster >/dev/null 2>&1 && [ -f "$_wl/common.txt" ] && _t=$((_t + 1))
+    command -v gobuster >/dev/null 2>&1 && [ "$AGGRESSIVE_MODE" = true ] && [ -f "$_wl/big.txt" ] && _t=$((_t + 1))
+    command -v nuclei >/dev/null 2>&1 && _t=$((_t + 1))
+    command -v nikto >/dev/null 2>&1 && [ "$QUICK_MODE" != true ] && _t=$((_t + 1))
+    ui_phase_begin "WEB APPLICATION TESTING" "$_t"
+    echo -e "${CYAN}[TARGET]${NC} $url"
+
     # Quick check for open web ports
     execute_scan "Web Port Check" \
         "timeout 30 nmap -Pn -p 80,443,8080,8443 --open '$domain' 2>/dev/null | \
          grep -E 'open' || echo 'No standard web ports detected (continuing anyway)'" \
         $TIMEOUT_SHORT "$OUTDIR/web/port_check.txt"
-    
-    # Web technology detection with WhatWeb
-    if command -v whatweb &> /dev/null; then
-        execute_scan "Technology Detection (WhatWeb)" \
-            "whatweb -a 3 -v --max-threads 20 '$url' 2>/dev/null || echo 'WhatWeb failed'" \
-            $TIMEOUT_MEDIUM "$OUTDIR/web/whatweb.txt"
-    fi
-    
-    # WAF detection with wafw00f + web evasion adaptation
+
+    # Fingerprinting: WhatWeb, wafw00f and SSL/TLS analysis are independent —
+    # run them concurrently, then adapt web evasion from the WAF result.
     local web_evasion; web_evasion="$(active_evasion)"
-    if command -v wafw00f &> /dev/null; then
-        execute_scan "WAF Detection (wafw00f)" \
-            "wafw00f '$url' 2>/dev/null || echo 'wafw00f failed'" \
-            $TIMEOUT_SHORT "$OUTDIR/web/wafw00f.txt"
-        # A detected WAF means slow down + randomize UA, or risk getting blacklisted.
-        if [ -f "$OUTDIR/web/wafw00f.txt" ] && grep -qi "is behind" "$OUTDIR/web/wafw00f.txt"; then
-            local waf_name; waf_name="$(grep -i 'is behind' "$OUTDIR/web/wafw00f.txt" | head -1)"
-            web_evasion="$(waf_evasion_profile "$waf_name")"
-            echo -e "${YELLOW}[WAF]${NC} WAF detected — web evasion raised to ${WHITE}${web_evasion}${NC}"
-        fi
+    local _fp=( "_web_ssl '$domain'" )
+    command -v whatweb >/dev/null 2>&1 && _fp+=( "_web_whatweb '$url'" )
+    command -v wafw00f >/dev/null 2>&1 && _fp+=( "_web_wafw00f '$url'" )
+    run_scan_group "Web fingerprint" "${_fp[@]}"
+
+    # A detected WAF means slow down + randomize UA, or risk getting blacklisted.
+    if [ -f "$OUTDIR/web/wafw00f.txt" ] && grep -qi "is behind" "$OUTDIR/web/wafw00f.txt"; then
+        local waf_name; waf_name="$(grep -i 'is behind' "$OUTDIR/web/wafw00f.txt" | head -1)"
+        web_evasion="$(waf_evasion_profile "$waf_name")"
+        echo -e "${YELLOW}[WAF]${NC} WAF detected — web evasion raised to ${WHITE}${web_evasion}${NC}"
     fi
-    
-    # Comprehensive SSL/TLS analysis (certificates, ciphers, vulnerabilities)
-    execute_scan "SSL/TLS Analysis" \
-        "echo '=== Certificate Information ==='
-         echo | timeout 20 openssl s_client -connect '$domain:443' -servername '$domain' 2>/dev/null | \
-         openssl x509 -text 2>/dev/null | head -50 || echo 'SSL connection failed'
-         echo
-         echo '=== Cipher Suites ==='
-         timeout 90 nmap -Pn --script ssl-enum-ciphers -p 443 '$domain' 2>/dev/null | head -80 || echo 'SSL cipher scan failed'
-         echo
-         echo '=== SSL Vulnerabilities ==='
-         timeout 90 nmap -Pn --script ssl-heartbleed,ssl-poodle,ssl-ccs-injection,ssl-dh-params \
-              -p 443 '$domain' 2>/dev/null || echo 'SSL vuln scan failed'
-         if command -v sslscan &> /dev/null; then
-             echo
-             echo '=== SSLScan Results ==='
-             timeout 60 sslscan '$domain' 2>/dev/null | head -100 || echo 'sslscan failed'
-         fi" \
-        $TIMEOUT_LONG "$OUTDIR/web/ssl_analysis.txt"
-    
+
     # Directory brute-forcing with gobuster
     local wordlist_dir="/usr/share/wordlists/dirb"
     [ ! -d "$wordlist_dir" ] && wordlist_dir="$HOME/.local/share/wordlists/dirb"
@@ -246,4 +227,37 @@ cat $OUTDIR/web/xss_payloads.txt" \
         $TIMEOUT_VERY_SHORT "$OUTDIR/web/xss_payloads.txt"
     
     echo -e "${GREEN}[COMPLETE]${NC} Web application testing completed"
+}
+
+# --- Independent web-fingerprint tasks (used by run_scan_group) --------------
+_web_whatweb() {
+    execute_scan "Technology Detection (WhatWeb)" \
+        "whatweb -a 3 -v --max-threads 20 '$1' 2>/dev/null || echo 'WhatWeb failed'" \
+        "$TIMEOUT_MEDIUM" "$OUTDIR/web/whatweb.txt"
+}
+
+_web_wafw00f() {
+    execute_scan "WAF Detection (wafw00f)" \
+        "wafw00f '$1' 2>/dev/null || echo 'wafw00f failed'" \
+        "$TIMEOUT_SHORT" "$OUTDIR/web/wafw00f.txt"
+}
+
+_web_ssl() {
+    execute_scan "SSL/TLS Analysis" \
+        "echo '=== Certificate Information ==='
+         echo | timeout 20 openssl s_client -connect '$1:443' -servername '$1' 2>/dev/null | \
+         openssl x509 -text 2>/dev/null | head -50 || echo 'SSL connection failed'
+         echo
+         echo '=== Cipher Suites ==='
+         timeout 90 nmap -Pn --script ssl-enum-ciphers -p 443 '$1' 2>/dev/null | head -80 || echo 'SSL cipher scan failed'
+         echo
+         echo '=== SSL Vulnerabilities ==='
+         timeout 90 nmap -Pn --script ssl-heartbleed,ssl-poodle,ssl-ccs-injection,ssl-dh-params \
+              -p 443 '$1' 2>/dev/null || echo 'SSL vuln scan failed'
+         if command -v sslscan &> /dev/null; then
+             echo
+             echo '=== SSLScan Results ==='
+             timeout 60 sslscan '$1' 2>/dev/null | head -100 || echo 'sslscan failed'
+         fi" \
+        "$TIMEOUT_LONG" "$OUTDIR/web/ssl_analysis.txt"
 }
